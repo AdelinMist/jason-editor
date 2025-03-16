@@ -1,2 +1,2 @@
 def main():
-    return ['island1', 'island2', 'island3']
+    return ['island1', 'island2', 'island3', 'None']

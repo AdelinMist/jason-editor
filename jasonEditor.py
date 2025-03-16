@@ -8,6 +8,9 @@ from pydantic import BaseModel, ValidationError
 from typing import List
 
 def highlight_is_valid(val):
+    """
+    Returns CSS based on value.
+    """
     if isinstance(val, bool):
         color = 'green' if bool(val) else 'red'
     else:
@@ -15,6 +18,11 @@ def highlight_is_valid(val):
     return 'background-color: {}'.format(color)
 
 def validate_df(df, validation_cls, error_df_name):
+    """
+    Runs a pydantic validation on the dataframe passed.
+    Recreates the error dataframe based on current validation errors.
+    Sets the 'is_valid' column on the dataframe based on validation results.
+    """
     st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0]
     ValidationClass = validation_cls
     # Wrap the data_schema into a helper class for validation
@@ -37,6 +45,11 @@ def validate_df(df, validation_cls, error_df_name):
     return df
 
 def data_editor_on_change(**kwargs):
+    """
+    Runs on change of the data editor component.
+    Handles the changed data, and updates the relevant dataframe.
+    Runs the validation function on the newly changed dataframe.
+    """
     cls_obj = kwargs['cls_obj']
     df_name = kwargs['df_name']
     error_df_name = kwargs['error_df_name']
@@ -51,21 +64,41 @@ def data_editor_on_change(**kwargs):
         df_row = pd.DataFrame.from_records([row])
         st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
         
+    for row_index in state["deleted_rows"]:
+        print(row_index)
+        print(st.session_state[df_name])
+        st.session_state[df_name].drop(row_index, inplace=True)
+        print(st.session_state[df_name])
+        
     st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
     
 def download_button_on_click():
+    """
+    Stupid function that shows snow on screen when the download button is clicked!
+    """
     st.snow()
 
 @st.cache_data
 def convert_for_download(df):
-    df_to_convert = df.copy(deep=True).replace('None', '')
+    """
+    Converts the dataframe to a json object.
+    Also replaces the string 'None' values with empty strings.
+    This functions result is cached.
+    """
+    df_to_convert = df.copy(deep=True).replace('None', '').drop(columns=['is_valid'])
     return df_to_convert.to_json(orient='records').encode("utf-8")
     
 class Page():
+    """
+    This class exists to support the multipage architecture. It was a necessity.
+    """
     def __init__(self, cls):
         self.cls = cls
     
     def run_page(self):
+        """
+        The 'main' fucntion of each page. Runs everything.
+        """
         cls_name = self.cls['name']
         cls_obj = self.cls['obj']
         members = list(cls_obj.model_fields.keys())
@@ -156,6 +189,9 @@ class Page():
         )
         
     def get_page(self):
+        """
+        Returns the page object as needed.
+        """
         split_name = re.sub( r"([A-Z])", r" \1", self.cls['name']).split()
         lower_split_name = [word.lower() for word in split_name]
         url_pathname = '-'.join(lower_split_name)
