@@ -12,8 +12,9 @@ def import_from_path(module_name, file_path):
 
 def create_variable(name, value):
     globals()[name] = value
-
-data_module_dir = './data_plugins'
+    
+file_path = os.path.abspath(os.path.dirname(__file__))
+data_module_dir = f"{file_path}/data_plugins"
 directory = os.fsencode(data_module_dir)
 
 for file in os.listdir(directory):

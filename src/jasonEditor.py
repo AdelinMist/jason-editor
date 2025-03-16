@@ -40,7 +40,6 @@ def validate_df(df, validation_cls, error_df_name):
             invalid_col = err_inst['loc'][2]
             st.session_state[error_df_name].loc[invalid_index, invalid_col] = err_inst['msg']
             df.loc[invalid_index, 'is_valid'] = False
-        print(err)
         
     return df
 
@@ -142,13 +141,6 @@ class Page():
         if  df_name not in st.session_state:
             # Create an empty DataFrame with column names
             st.session_state[df_name] = pd.DataFrame(columns=[*members, 'is_valid'])
-            
-            df2 = pd.DataFrame({'hostname':['hedfghjkdfghjkfghjllo'], 'ipAddress':['2222'], 'domain':['234567'], 'datacenter':['dfghjjh'], 'island':['fghjkl'], 'is_valid':[False]})
-            
-
-            # to append df2 at the end of df1 dataframe
-            st.session_state[df_name] = pd.concat([st.session_state[df_name], df2], ignore_index=True)
-            validate_df(st.session_state[df_name], cls_obj, error_df_name)
         
         st.session_state[styled_df_name] = st.session_state[df_name].style.applymap(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
