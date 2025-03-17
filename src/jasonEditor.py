@@ -6,6 +6,7 @@ import re
 import inspect, sys
 from pydantic import BaseModel, ValidationError
 from typing import List
+from logger import logger
 
 def highlight_is_valid(val):
     """
