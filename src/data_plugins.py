@@ -11,6 +11,7 @@ def import_from_path(module_name, file_path):
     return module
 
 def create_variable(name, value):
+    """Creates a variable, dynamically, given name and value."""
     globals()[name] = value
     
 file_path = os.path.abspath(os.path.dirname(__file__))

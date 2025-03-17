@@ -1,123 +1,30 @@
-from pydantic import field_validator, Field, BaseModel
-from typing import Annotated
-import data_plugins as dp
+import enum
+import os, sys
+import importlib
+import inspect
 
-class WindowsMachine(BaseModel):
-    __icon: str = ':material/sword_rose:'
+def import_from_path(module_name, file_path):
+    """Import a module given its name and file path."""
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
     
-    hostname: str = Field(description="The machine hostname.")  # the previous defined Enum class
-    
-    ipAddress: str = Field(description="The machine ip address.")
+file_path = os.path.abspath(os.path.dirname(__file__))
+validation_module_dir = f"{file_path}/validation_classes"
+directory = os.fsencode(validation_module_dir)
 
-    domain: str = Field(description="The domain of the machine.",)
-    
-    datacenter: dp.Datacenters = Field(description="The datacenter of the machine.",)
-    
-    island: str = Field(description="The network island of the machine.",)
-
-    @field_validator('hostname', mode='after')  
-    @classmethod
-    def is_valid_hostname(cls, value: str) -> str:
-        if len(value) > 15:
-            raise ValueError(f'{value} is not valid hostname!')
-        return value 
-
-    @field_validator('ipAddress', mode='after')  
-    @classmethod
-    def is_valid_ip_address(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('domain', mode='after')  
-    @classmethod
-    def is_valid_domain(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('datacenter', mode='after')  
-    @classmethod
-    def is_valid_datacenter(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('island', mode='after')  
-    @classmethod
-    def is_valid_island(cls, value: str) -> str:
-        return value 
-    
-class LinuxMachine(BaseModel):
-    __icon: str = ':material/ac_unit:'
-    
-    hostname: str = Field(description="The machine hostname.")  # the previous defined Enum class
-    
-    ipAddress: str = Field(description="The machine ip address.")
-
-    domain: str = Field(description="The domain of the machine.",)
-    
-    datacenter: dp.Datacenters = Field(description="The datacenter of the machine.",)
-    
-    island: str = Field(description="The network island of the machine.",)
-
-    @field_validator('hostname', mode='after')  
-    @classmethod
-    def is_valid_hostname(cls, value: str) -> str:
-        if len(value) > 15:
-            raise ValueError(f'{value} is not valid hostname!')
-        return value 
-
-    @field_validator('ipAddress', mode='after')  
-    @classmethod
-    def is_valid_ip_address(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('domain', mode='after')  
-    @classmethod
-    def is_valid_domain(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('datacenter', mode='after')  
-    @classmethod
-    def is_valid_datacenter(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('island', mode='after')  
-    @classmethod
-    def is_valid_island(cls, value: str) -> str:
-        return value 
-    
-class NoOsMachine(BaseModel):
-    __icon: str = ':material/sword_rose:'
-    
-    hostname: str = Field(description="The machine hostname.")  # the previous defined Enum class
-    
-    ipAddress: str = Field(description="The machine ip address.")
-
-    domain: str = Field(description="The domain of the machine.",)
-    
-    datacenter: dp.Datacenters = Field(description="The datacenter of the machine.",)
-    
-    island: dp.Islands = Field(description="The network island of the machine.",)
-
-    @field_validator('hostname', mode='after')  
-    @classmethod
-    def is_valid_hostname(cls, value: str) -> str:
-        if len(value) > 15:
-            raise ValueError(f'{value} is not valid hostname!')
-        return value 
-
-    @field_validator('ipAddress', mode='after')  
-    @classmethod
-    def is_valid_ip_address(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('domain', mode='after')  
-    @classmethod
-    def is_valid_domain(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('datacenter', mode='after')  
-    @classmethod
-    def is_valid_datacenter(cls, value: str) -> str:
-        return value 
-    
-    @field_validator('island', mode='after')  
-    @classmethod
-    def is_valid_island(cls, value: str) -> str:
-        return value 
+classes = []
+for file in os.listdir(directory):
+    filename = os.fsdecode(file)
+    if filename.endswith(".py"): 
+        try:
+            filename_stripped = filename.replace(".py","")
+            validation_module = import_from_path(filename_stripped, f"{validation_module_dir}/{filename}")
+            module_classes = [{'name': cls_name, 'obj': cls_obj} for cls_name, cls_obj in inspect.getmembers(validation_module) if inspect.isclass(cls_obj) and cls_obj.__module__ == validation_module.__name__]
+            classes.append(*module_classes)
+        except Exception as err:
+            raise ValueError(f"Couldn't get validation classes from validation plugin named {filename}.\nThe error was: {err}.")
+    else:
+        continue

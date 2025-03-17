@@ -193,11 +193,8 @@ class Page():
         
 
 if __name__ == '__main__':
-    
-    classes = [{'name': cls_name, 'obj': cls_obj}for cls_name, cls_obj in inspect.getmembers(sys.modules['validation']) if inspect.isclass(cls_obj) and cls_obj.__module__ == 'validation']
-
     page_list = []
-    for cls in classes:
+    for cls in validation.classes:
         pageObj = Page(cls)
         #pageObj.run_page()
         page_list.append(pageObj.get_page())
