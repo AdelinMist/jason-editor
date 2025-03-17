@@ -11,7 +11,7 @@ class LinuxMachine(BaseModel):
 
     domain: str = Field(description="The domain of the machine.",)
     
-    datacenter: dp.Datacenters = Field(description="The datacenter of the machine.",)
+    datacenter: dp.Datacenter = Field(description="The datacenter of the machine.",)
     
     island: str = Field(description="The network island of the machine.",)
 

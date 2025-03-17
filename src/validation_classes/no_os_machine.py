@@ -11,9 +11,9 @@ class NoOsMachine(BaseModel):
 
     domain: str = Field(description="The domain of the machine.",)
     
-    datacenter: dp.Datacenters = Field(description="The datacenter of the machine.",)
+    datacenter: dp.Datacenter = Field(description="The datacenter of the machine.",)
     
-    island: dp.Islands = Field(description="The network island of the machine.",)
+    island: dp.Island = Field(description="The network island of the machine.",)
 
     @field_validator('hostname', mode='after')  
     @classmethod

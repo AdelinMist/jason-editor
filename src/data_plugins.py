@@ -25,10 +25,11 @@ for file in os.listdir(directory):
         try:
             filename_stripped = filename.replace(".py","")
             data_module = import_from_path(filename_stripped, f"{data_module_dir}/{filename}")
-            data_values = data_module.main()
-            data_dict = {f"{val}": val for val in data_values}
-            data_enum = enum.Enum(filename_stripped, data_dict)
-            create_variable(filename_stripped.capitalize(), data_enum)
+            data_values_dict = data_module.main()
+            for name, values in data_values_dict.items():
+                data_dict = {f"{val}": val for val in values}
+                data_enum = enum.Enum(name, data_dict)
+                create_variable(name, data_enum)
         except Exception as err:
             logger.error(f"Couldn't get data from data plugin named {filename}.\nThe error was: {err}.")
             raise ValueError(f"Couldn't get data from data plugin named {filename}.\nThe error was: {err}.")
