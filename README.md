@@ -98,6 +98,12 @@ src/validation_classes
 └── windows_machine.py
 ```
 
+## Logs
+
+This application doesn't write many logs, but the logger is defined in the 'logger.py' file.
+Logs are written for an incorrect parsing of the data plugins and the validation classes.
+The logs are written to the stdout and to a log file named 'logs.txt'.
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first
