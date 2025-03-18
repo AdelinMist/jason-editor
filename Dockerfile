@@ -9,8 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src ./src
 EXPOSE 8080
 
-# Setup an app user so the container doesn't run as the root user
-RUN useradd app
+# Setup an app user so the container doesn't run as the root user, also add permission for /app to the new user
+RUN useradd app; chmod -R u+rwx .; chown -R app .
 USER app
 
 CMD ["streamlit", "run", "./src/jasonEditor.py", "--server.port", "8080"]

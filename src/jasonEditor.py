@@ -174,7 +174,7 @@ class Page():
         st.download_button(
             label="Download JSON",
             data=json_obj,
-            file_name="data.json",
+            file_name=f"{cls_name}_data.json",
             mime="text/json",
             icon=":material/download:",
             disabled=download_disabled,
