@@ -88,10 +88,7 @@ class Page():
             st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
             
         for row_index in state["deleted_rows"]:
-            print(row_index)
-            print(st.session_state[df_name])
             st.session_state[df_name].drop(row_index, inplace=True)
-            print(st.session_state[df_name])
             
         st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
         
@@ -110,40 +107,40 @@ class Page():
             # Can be used wherever a "file-like" object is accepted:
             file_type = uploaded_file.name.split('.')[1]
             
-            if file_type == 'csv':
+            is_csv = file_type == 'csv'
+            is_json = file_type == 'json'
+            if is_csv:
                 try:
                     dataframe = pd.read_csv(uploaded_file, index_col=0)
                 except Exception as err:
                     st.exception(err)
-                    is_csv = False
-            elif file_type == 'json':
+            elif is_json:
                 try:
                     dataframe = pd.read_json(uploaded_file, orient='records')
-                    print(dataframe)
                 except Exception as err:
-                    json_err = err
-                    is_json = False
+                    st.exception(err)
             else:
                 st.error("File was neither CSV or JSON! Please select a CSV/JSON file!")
+            
+            if is_json or is_csv:
+                dataframe = dataframe.astype(str)
                 
-            dataframe = dataframe.astype(str)
-            
-            # add the is_valid column if not existent
-            if 'is_valid' not in dataframe.columns:
-                dataframe.assign(is_valid=False)
-            
-            # try to add the uploaded df to the saved one, throw exception if columns don't match
-            try:
-                st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
-            except Exception as err:
-                st.exception(err)
+                # add the is_valid column if not existent
+                if 'is_valid' not in dataframe.columns:
+                    dataframe.assign(is_valid=False)
                 
-            st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
-            
-            # this is a hack to make this whole function run once for each file uploaded.
-            st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
-            
-            st.rerun()
+                # try to add the uploaded df to the saved one, throw exception if columns don't match
+                try:
+                    st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
+                except Exception as err:
+                    st.exception(err)
+                    
+                st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+                
+                # this is a hack to make this whole function run once for each file uploaded.
+                st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
+                
+                st.rerun()
             
     def download_json(self, df_name, error_df_name):
         """
@@ -221,7 +218,7 @@ class Page():
             # Create an empty DataFrame with column names
             st.session_state[df_name] = pd.DataFrame(columns=[*members, 'is_valid'])
         
-        st.session_state[styled_df_name] = st.session_state[df_name].style.applymap(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
+        st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
         st.subheader('Editor')
         st.data_editor(
