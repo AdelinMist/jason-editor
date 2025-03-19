@@ -43,34 +43,6 @@ def validate_df(df, validation_cls, error_df_name):
             df.loc[invalid_index, 'is_valid'] = False
         
     return df
-
-def data_editor_on_change(**kwargs):
-    """
-    Runs on change of the data editor component.
-    Handles the changed data, and updates the relevant dataframe.
-    Runs the validation function on the newly changed dataframe.
-    """
-    cls_obj = kwargs['cls_obj']
-    df_name = kwargs['df_name']
-    error_df_name = kwargs['error_df_name']
-    edited_df_name = kwargs['edited_df_name']
-    state = st.session_state[edited_df_name]
-    
-    for index, updates in state["edited_rows"].items():
-        for key, value in updates.items():
-            st.session_state[df_name].loc[st.session_state[df_name].index == index, key] = value
-             
-    for row in state["added_rows"]:
-        df_row = pd.DataFrame.from_records([row])
-        st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
-        
-    for row_index in state["deleted_rows"]:
-        print(row_index)
-        print(st.session_state[df_name])
-        st.session_state[df_name].drop(row_index, inplace=True)
-        print(st.session_state[df_name])
-        
-    st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
     
 def download_button_on_click():
     """
@@ -94,6 +66,112 @@ class Page():
     """
     def __init__(self, cls):
         self.cls = cls
+        
+    def data_editor_on_change(self, **kwargs):
+        """
+        Runs on change of the data editor component.
+        Handles the changed data, and updates the relevant dataframe.
+        Runs the validation function on the newly changed dataframe.
+        """
+        cls_obj = self.cls['obj']
+        df_name = kwargs['df_name']
+        error_df_name = kwargs['error_df_name']
+        edited_df_name = kwargs['edited_df_name']
+        state = st.session_state[edited_df_name]
+        
+        for index, updates in state["edited_rows"].items():
+            for key, value in updates.items():
+                st.session_state[df_name].loc[st.session_state[df_name].index == index, key] = value
+                
+        for row in state["added_rows"]:
+            df_row = pd.DataFrame.from_records([row])
+            st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
+            
+        for row_index in state["deleted_rows"]:
+            print(row_index)
+            print(st.session_state[df_name])
+            st.session_state[df_name].drop(row_index, inplace=True)
+            print(st.session_state[df_name])
+            
+        st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+        
+    def upload_file(self, df_name, error_df_name):
+        """
+        Handles file uploading into the app.
+        """
+        cls_name = self.cls['name']
+        cls_obj = self.cls['obj']
+        
+        if  'file_uploader_key' not in st.session_state:
+            st.session_state['file_uploader_key'] = 0
+        
+        uploaded_file = st.file_uploader("Choose a CSV/JSON file", key=st.session_state['file_uploader_key'])
+        if uploaded_file is not None:
+            # Can be used wherever a "file-like" object is accepted:
+            file_type = uploaded_file.name.split('.')[1]
+            
+            if file_type == 'csv':
+                try:
+                    dataframe = pd.read_csv(uploaded_file, index_col=0)
+                except Exception as err:
+                    st.exception(err)
+                    is_csv = False
+            elif file_type == 'json':
+                try:
+                    dataframe = pd.read_json(uploaded_file, orient='records')
+                    print(dataframe)
+                except Exception as err:
+                    json_err = err
+                    is_json = False
+            else:
+                st.error("File was neither CSV or JSON! Please select a CSV/JSON file!")
+                
+            dataframe = dataframe.astype(str)
+            
+            # add the is_valid column if not existent
+            if 'is_valid' not in dataframe.columns:
+                dataframe.assign(is_valid=False)
+            
+            # try to add the uploaded df to the saved one, throw exception if columns don't match
+            try:
+                st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
+            except Exception as err:
+                st.exception(err)
+                
+            st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+            
+            # this is a hack to make this whole function run once for each file uploaded.
+            st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
+            
+            st.rerun()
+            
+    def download_json(self, df_name, error_df_name):
+        """
+        Handles the download of files.
+        """
+        cls_name = self.cls['name']
+        
+        # handle download and data validity message
+        download_disabled = False if st.session_state[df_name]['is_valid'].all() else True
+        
+        if download_disabled:
+            st.error(f"The values are not valid!")
+            st.subheader('Errors')
+            st.dataframe(st.session_state[error_df_name], use_container_width=True)
+        else:
+            st.success(f"The values are valid!")
+            
+        json_obj = convert_for_download(st.session_state[df_name])
+
+        st.download_button(
+            label="Download JSON",
+            data=json_obj,
+            file_name=f"{cls_name}_data.json",
+            mime="text/json",
+            icon=":material/download:",
+            disabled=download_disabled,
+            on_click=download_button_on_click
+        )
     
     def run_page(self):
         """
@@ -153,33 +231,16 @@ class Page():
             disabled=["is_valid"],
             num_rows="dynamic",
             hide_index=False,
-            on_change=data_editor_on_change,
+            on_change=self.data_editor_on_change,
             kwargs={'cls_name': cls_name, 'cls_obj': cls_obj, 'df_name': df_name, 'edited_df_name': edited_df_name, 'error_df_name': error_df_name},
             use_container_width=False,
             width=10000,
         )
         
-        # handle download and data validity message
-        download_disabled = False if st.session_state[df_name]['is_valid'].all() else True
+        self.upload_file(df_name, error_df_name)
         
-        if download_disabled:
-            st.error(f"The values are not valid!")
-            st.subheader('Errors')
-            st.dataframe(st.session_state[error_df_name], use_container_width=True)
-        else:
-            st.success(f"The values are valid!")
-            
-        json_obj = convert_for_download(st.session_state[df_name])
-
-        st.download_button(
-            label="Download JSON",
-            data=json_obj,
-            file_name=f"{cls_name}_data.json",
-            mime="text/json",
-            icon=":material/download:",
-            disabled=download_disabled,
-            on_click=download_button_on_click
-        )
+        if not st.session_state[df_name].empty:
+            self.download_json(df_name, error_df_name)
         
     def get_page(self):
         """
