@@ -3,10 +3,17 @@ import pandas as pd
 import validation
 import enum
 import re
-import inspect, sys
+import json
+import os
 from pydantic import BaseModel, ValidationError
 from typing import List
 from logger import logger
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+
+# jinja2 setup for the json schema templates
+# loading the environment
+file_path = os.path.abspath(os.path.dirname(__file__))
+env = Environment(loader = FileSystemLoader(f"{file_path}/json_schema_templates"))
 
 def highlight_is_valid(val):
     """
@@ -49,16 +56,47 @@ def download_button_on_click():
     Stupid function that shows snow on screen when the download button is clicked!
     """
     st.snow()
+    
+def render_jinja(template_name, **kwargs):
+    """
+    Renders the json schema template with the values from the dataframe row
+    """
+    # loading the template
+    template = env.get_template(template_name)
+
+    # rendering the template and storing the resultant text in variable output
+    output = template.render(**kwargs)
+    
+    return output
 
 @st.cache_data
-def convert_for_download(df):
+def convert_for_download(df, cls):
     """
     Converts the dataframe to a json object.
     Also replaces the string 'None' values with empty strings.
     This functions result is cached.
     """
     df_to_convert = df.copy(deep=True).replace('None', '').drop(columns=['is_valid'])
-    return df_to_convert.to_json(orient='records').encode("utf-8")
+    
+    if hasattr(cls['obj'], f"_{cls['name']}__json_schema_template_name"):
+        template_name = getattr(cls['obj'], f"_{cls['name']}__json_schema_template_name").default
+    else:
+        template_name = f"{cls['name']}.jinja"
+    
+    json_list = []
+    mapping =  dict.fromkeys(range(32)) # the json control chars
+    for row in df_to_convert.to_dict('records'):
+        try:
+            # we also remove json control chars from the result of templating!
+            rendered_schema = render_jinja(template_name, **row).translate(mapping)
+            json_to_add = json.loads(rendered_schema)
+        except TemplateNotFound as err:
+            json_to_add = row
+            
+        json_list.append(json_to_add)
+
+    
+    return json.dumps(json_list)
     
 class Page():
     """
@@ -130,17 +168,21 @@ class Page():
                     dataframe.assign(is_valid=False)
                 
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
-                try:
-                    st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
-                except Exception as err:
-                    st.exception(err)
+                if dataframe.columns.to_list() == st.session_state[df_name].columns.to_list():
+                    try:
+                        st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
+                    except Exception as err:
+                        st.exception(err)
                     
-                st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
-                
-                # this is a hack to make this whole function run once for each file uploaded.
-                st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
-                
-                st.rerun()
+                    st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+                    # this is a hack to make this whole function run once for each file uploaded.
+                    st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
+                    
+                    st.rerun()
+                else:
+                    st.error("File didn't have the correct columns! Please load a matching file next time!")
+                    st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
+
             
     def download_json(self, df_name, error_df_name):
         """
@@ -158,7 +200,7 @@ class Page():
         else:
             st.success(f"The values are valid!")
             
-        json_obj = convert_for_download(st.session_state[df_name])
+        json_obj = convert_for_download(st.session_state[df_name], self.cls)
 
         st.download_button(
             label="Download JSON",
@@ -251,11 +293,10 @@ class Page():
         return st.Page(self.run_page, title=page_title, icon=f"{page_icon.default}", url_path=url_pathname)
         
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     page_list = []
     for cls in validation.classes:
         pageObj = Page(cls)
-        #pageObj.run_page()
         page_list.append(pageObj.get_page())
             
     pg = st.navigation(page_list)

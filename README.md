@@ -12,6 +12,28 @@ This application was created with modularity in mind! Each validation class will
 You should build the image and add the data plugins and the validation classes to the image with volume mounts.
 
 This application has the following plugin capabilities:
+- Json Schema Templates:
+    These are Jinja2 based templates for each object.
+    In these files we can use the values we defined in the validation classes, to get the json object we want!
+    All the template file need to be in the json_schema_templates folder.
+    The files of the template should be named exactly as the validation class name you want to use it with.
+    You can also specify the attribute __json_schema_template_name in the class to select a different template.
+    Should the program fail to find any template file, the json will be based on the validation class attributes only (the columns).
+    For example (notice the {{}} jinja2 variable access):
+    ```python
+    {
+        "metadata": {
+            "fqdn": "{{hostname}}.{{domain}}"
+        },
+        "spec": {
+            "hostname": "{{hostname}}",
+            "ipaddress": "{{ipaddress}}",
+            "datacenter": "{{datacenter}}",
+            "island": "{{island}}",
+            "domain": "{{domain}}"
+        }
+    }
+    ```
 - Data Plugins:
     These are simple python files, with a main fucntion that should return the wanted values for a selectbox type field in the json editor.
     Each data plugin should return a dictionary with the values, each different key will be made into a different enum.
@@ -33,6 +55,8 @@ This application has the following plugin capabilities:
     When an Enum is used, the editor automatically makes that field into a selectbox with the Enum values.
     This can be used to restrict the users to certain values!
     The __icon hidden attribute sets the icon in the sidebar of the application for the page with this specific edited object.
+    The __json_schema_template_name hidden attribute sets name of the jinja2 template to use for the json object we download for this class.
+    Both hidden attributes are OPTIONAL!
 
     Simple example for a validation class file (windows_machine.py):
 
@@ -40,17 +64,19 @@ This application has the following plugin capabilities:
     from pydantic import field_validator, Field, BaseModel
     from typing import Annotated
     import data_plugins as dp
-
-    class WindowsMachine(BaseModel):
-        __icon: str = ':material/sword_rose:'
         
-        hostname: str = Field(description="The machine hostname.")
+    class LinuxMachine(BaseModel):
+        __icon: str = ':material/ac_unit:'
+        
+        __json_schema_template_name: str = 'linux_machine.jinja'
+        
+        hostname: str = Field(description="The machine hostname.")  # the previous defined Enum class
         
         ipAddress: str = Field(description="The machine ip address.")
 
         domain: str = Field(description="The domain of the machine.",)
         
-        datacenter: dp.Datacenter = Field(description="The datacenter of the machine.",)  # the previously defined Enum class, from the data plugin
+        datacenter: dp.Datacenter = Field(description="The datacenter of the machine.",)
         
         island: str = Field(description="The network island of the machine.",)
 
@@ -84,6 +110,13 @@ This application has the following plugin capabilities:
 
 
 The application structure for plugins is:
+
+```md
+src/json_schema_templates
+├── LinuxMachine.jinja
+├── WindowsMachine.jinja
+└── NoOsMachine.jinja
+```
 
 ```md
 src/data_plugins
