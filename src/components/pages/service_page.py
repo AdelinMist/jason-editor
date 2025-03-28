@@ -1,13 +1,12 @@
+
 import streamlit as st
 import pandas as pd
-import validation
 import enum
 import re
 import json
 import os
 from pydantic import BaseModel, ValidationError
 from typing import List
-from logger import logger
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 # jinja2 setup for the json schema templates
@@ -98,9 +97,10 @@ def convert_for_download(df, cls):
     
     return json.dumps(json_list)
     
-class Page():
+
+class ServicePage():
     """
-    This class exists to support the multipage architecture. It was a necessity.
+    This class exists to support the multipage architecture. This is a generic service type page.
     """
     def __init__(self, cls):
         self.cls = cls
@@ -291,14 +291,3 @@ class Page():
         page_title = ' '.join(split_name)
         page_icon = getattr(self.cls['obj'], f"_{self.cls['name']}__icon") # getting the default 
         return st.Page(self.run_page, title=page_title, icon=f"{page_icon.default}", url_path=url_pathname)
-        
-
-if __name__ == '__main__':    
-    page_list = []
-    for cls in validation.classes:
-        pageObj = Page(cls)
-        page_list.append(pageObj.get_page())
-            
-    pg = st.navigation(page_list)
-    st.set_page_config(layout="wide")
-    pg.run()

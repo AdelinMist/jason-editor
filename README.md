@@ -1,6 +1,6 @@
-# jason-editor
+# platform-ui
 
-A simple json editor with validation, created with streamlit.
+A simple ui for the platform project!
 
 ## Installation
 
