@@ -13,4 +13,4 @@ EXPOSE 443
 RUN useradd app; chmod -R u+rwx .; chown -R app .
 USER app
 
-CMD ["streamlit", "run", "./src/jason_editor.py", "--server.port", "443"]
+CMD ["streamlit", "run", "./src/platform-ui.py", "--server.port", "443"]
