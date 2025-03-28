@@ -3,3 +3,4 @@ pandas
 pydantic
 jinja2
 pymongo
+authlib
