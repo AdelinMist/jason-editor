@@ -2,36 +2,36 @@ def get_validator():
     validator = {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["title", "authors", "publication_date", \
-            "type", "copies"],
+            "required": ["request_objects"], #"title", "subject", "request_date", "project", "status", 
             "properties": {
                 "title": {
                     "bsonType": "string",
                     "description": "must be a string and is required"
                 },
-                "authors": {
-                    "bsonType": "array",
-                    "description": "must be an array and is required",
-                    "items": {
-                        "bsonType": "objectId",
-                        "description": "must be an objectId and is required"
-                    },
-                    "minItems": 1,
+                "project": {
+                    "bsonType": "objectId",
+                    "description": "must be an objectId and is required",
                 },
-                "publication_date": {
+                "request_date": {
                     "bsonType": "date",
                     "description": "must be a date and is required"
                 },
-                "type": {
-                    "enum": ["hardcover", "paperback"],
+                "status": {
+                    "enum": ["AWAITING_APPROVAL", "IN_PROGRESS", "COMPLETED", "FAILED"],
                     "description": "can only be one of the enum values and \
                     is required"
                 },
-                "copies": {
-                    "bsonType": "int",
-                    "description": "must be an integer greater than 0 and \
-                    is required",
-                    "minimum": 0
+                "subject": {
+                    "bsonType": "string",
+                    "description": "must be a string and is required",
+                },
+                "request_objects": {
+                    "bsonType": "array",
+                    "items": {
+                        "bsonType": "object"
+                    },
+                    "description": "must be an array of objects and is required, this is the json request body we will send to the backend",
+                    "minItems": 1,
                 }
             }
         }

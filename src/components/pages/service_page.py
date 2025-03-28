@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import enum
@@ -8,6 +7,7 @@ import os
 from pydantic import BaseModel, ValidationError
 from typing import List
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from mongo_db import insert_request
 
 # jinja2 setup for the json schema templates
 # loading the environment
@@ -69,7 +69,7 @@ def render_jinja(template_name, **kwargs):
     return output
 
 @st.cache_data
-def convert_for_download(df, cls):
+def convert_to_json(df, cls):
     """
     Converts the dataframe to a json object.
     Also replaces the string 'None' values with empty strings.
@@ -96,6 +96,15 @@ def convert_for_download(df, cls):
 
     
     return json.dumps(json_list)
+
+def submit_button_on_click(**kwargs):
+    """
+    Handles submission on new request!
+    """
+    request_objects = kwargs["request_jsons"]
+    
+    insert_request(request_objects)
+    
     
 
 class ServicePage():
@@ -200,7 +209,7 @@ class ServicePage():
         else:
             st.success(f"The values are valid!")
             
-        json_obj = convert_for_download(st.session_state[df_name], self.cls)
+        json_obj = convert_to_json(st.session_state[df_name], self.cls)
 
         st.download_button(
             label="Download JSON",
@@ -210,6 +219,34 @@ class ServicePage():
             icon=":material/download:",
             disabled=download_disabled,
             on_click=download_button_on_click
+        )
+        
+    def submit_request(self, df_name, error_df_name):
+        """
+        Handles the submission of a request.
+        """
+        cls_name = self.cls['name']
+        
+        # handle download and data validity message
+        submit_disabled = False if st.session_state[df_name]['is_valid'].all() else True
+        
+        if submit_disabled:
+            st.error(f"The values are not valid!")
+            st.subheader('Errors')
+            st.dataframe(st.session_state[error_df_name], use_container_width=True)
+        else:
+            st.success(f"The values are valid!")
+            
+        json_obj = convert_to_json(st.session_state[df_name], self.cls)
+
+        submit_btn_name = f"submit_btn_{cls_name}"
+        st.button(
+            label="Submit Request",
+            key=submit_btn_name,
+            icon=":material/skull:",
+            disabled=submit_disabled,
+            on_click=download_button_on_click,
+            kwargs={'request_jsons': json_obj}
         )
     
     def run_page(self):
@@ -279,7 +316,7 @@ class ServicePage():
         self.upload_file(df_name, error_df_name)
         
         if not st.session_state[df_name].empty:
-            self.download_json(df_name, error_df_name)
+            self.submit_request(df_name, error_df_name)
         
     def get_page(self):
         """

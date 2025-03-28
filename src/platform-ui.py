@@ -1,8 +1,9 @@
 import streamlit as st
 import validation
-#import mongo as mon
+from mongo_db import get_database, insert_request
 import utils.authentication as auth
 from components.pages.service_page import ServicePage
+from components.pages.requests_page import RequestsPage
 
 
 if __name__ == '__main__':
@@ -10,11 +11,16 @@ if __name__ == '__main__':
     
     auth.login()
     
+    db = get_database()
+    insert_request([{"hello":"hi"}])
+    
     with st.sidebar:
         st.markdown(f"Welcome! {st.experimental_user.name}")
         auth.logout()
     
-    pages = {}
+    pages = {
+        "Main": [RequestsPage().get_page()]
+    }
     for category, class_list in validation.classes.items():
         class_page_list = [ServicePage(cls).get_page() for cls in class_list]
         pages.update({category: class_page_list})
