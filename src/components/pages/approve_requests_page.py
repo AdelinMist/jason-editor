@@ -50,12 +50,12 @@ class ApproveRequestsPage():
         if '_id' in columns_to_display:
             columns_to_display.remove('_id')
         
-        st.subheader('Requests Awaiting Approval')
+        st.subheader('Requests For Approval')
         requests = st.dataframe(
             st.session_state["approval_requests_df"],
             column_config={
                 "request_objects": st.column_config.JsonColumn(
-                    "JSON Data",
+                    "request data",
                     help="JSON strings or objects",
                     width="large",
                 ),

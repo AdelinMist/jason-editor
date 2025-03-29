@@ -2,7 +2,8 @@ import streamlit as st
 import validation
 import utils.authentication as auth
 from components.pages.service_page import ServicePage
-from components.pages.requests_page import RequestsPage
+from components.pages.requests_page import MyRequestsPage
+from components.pages.all_requests_page import AllRequestsPage
 from components.pages.approve_requests_page import ApproveRequestsPage
 from components.pages.new_project_page import NewProjectPage
 
@@ -28,7 +29,7 @@ if __name__ == '__main__':
             }
         else:
             pages = {
-                "Admin": [ApproveRequestsPage().get_page(), NewProjectPage().get_page()]
+                "Admin": [AllRequestsPage().get_page(), ApproveRequestsPage().get_page(), NewProjectPage().get_page()]
             }
     else:
         pages = {}
@@ -38,7 +39,7 @@ if __name__ == '__main__':
         
     if has_project:
         pages.update({
-            "Main": [RequestsPage().get_page()]
+            "Main": [MyRequestsPage().get_page()]
         })
         
         for category, class_list in validation.classes.items():

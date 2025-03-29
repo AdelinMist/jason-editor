@@ -136,9 +136,40 @@ def get_requests_by_id(ids):
     return requests[0]
 
 @st.cache_data(ttl=100)
+def get_all_requests():
+    """
+    Retrieves the all requests.
+    """
+    db = get_database()
+    
+    # pipeline to replace the project reference with the project name
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "projects",            
+                "localField": "project",
+                "foreignField": "_id",
+                "as": "project"
+            }
+        },
+        {
+            "$addFields": {
+                "project": "$project.name",
+            }
+        },
+        { "$unwind": "$project" }
+    ]
+    
+    requests = db['requests'].aggregate(pipeline)
+    
+    requests = list(requests)
+
+    return requests
+
+@st.cache_data(ttl=100)
 def get_requests_for_approval():
     """
-    Retrieves the matched project for the connected user.
+    Retrieves the matched requests awaiting approval.
     """
     db = get_database()
     
@@ -216,6 +247,7 @@ def update_requests(requests):
     # clear the cache for the getter functions
     get_requests_for_approval.clear()
     get_my_requests.clear()
+    get_all_requests.clear()
 
 def insert_request(req_type, request_objects):
     """
@@ -245,5 +277,6 @@ def insert_request(req_type, request_objects):
     # clear the cache for the getter functions
     get_requests_for_approval.clear()
     get_my_requests.clear()
+    get_all_requests.clear()
     
     return new_request
