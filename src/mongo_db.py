@@ -2,6 +2,8 @@ import streamlit as st
 import pymongo
 import models.project
 import models.request
+import json
+from logger import logger
 from datetime import datetime, timezone
         
 # Initialize connection.
@@ -22,8 +24,9 @@ def init_project_collection(db):
         # Creating a new collection
         try:
             db.create_collection('projects')
+            db.projects.createIndex( { "name": 1 }, { "unique": "true" } )
         except Exception as e:
-            print(e)
+            logger.error(e)
             
     # Add the schema validation!
     db.command("collMod", "projects", validator=models.project.get_validator())
@@ -36,7 +39,7 @@ def init_request_collection(db):
         try:
             db.create_collection('requests')
         except Exception as e:
-            print(e)
+            logger.error(e)
             
     # Add the schema validation!
     db.command("collMod", "requests", validator=models.request.get_validator())
@@ -44,14 +47,14 @@ def init_request_collection(db):
 
 # Pull data from the collection.
 # Uses st.cache_data to only rerun when the query changes or after 10 min.
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=100)
 def get_data():
     db = get_database()
     items = db.mycollection.find()
     items = list(items)  # make hashable for st.cache_data
     return items
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=100)
 def get_project():
     """
     Retrieves the matched project for the connected user.
@@ -65,7 +68,7 @@ def get_project():
     
     return projects[0]
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=100)
 def get_project_by_id(id):
     """
     Retrieves the matched project by id.
@@ -77,18 +80,49 @@ def get_project_by_id(id):
     
     return projects[0]
 
-def insert_projects(projects):
+@st.cache_data(ttl=100)
+def get_projects():
     """
-    Inserts a new project to the database.
+    Retrieves the matched project for the connected user.
+    """
+    db = get_database()
+
+    projects = db['projects'].find({}, {'_id': 0})
+    
+    list_to_str = lambda kv: (kv[0], json.dumps(kv[1])) if kv[0]=='groups' else (kv[0], kv[1])
+    
+    projects = list(projects)  # if for some reason there are multiple matches
+    projects = [dict(map(list_to_str, prj.items())) for prj in projects]
+    
+    return projects
+
+def upsert_projects(projects):
+    """
+    Updates projects in the database, inserts if no project exists.
     """
     db = get_database()
     
     try:
-        new_projects = db['projects'].insert_many(projects)
+        for project in projects:
+            db['projects'].update_one({'name': { '$eq': project['name'] }}, { "$set": project }, upsert=True)
     except Exception as err:
-        raise Exception("Error inserting projects to db: ", err)
+        raise Exception("Error upserting projects to db: ", err)
     
-    return new_projects
+    # clear the cache for the getter functions
+    get_projects.clear()
+    get_project.clear()
+    
+def delete_projects(projects):
+    """
+    Deletes projects in the database, by name.
+    """
+    db = get_database()
+    
+    try:
+        for project in projects:
+            db['projects'].delete_many({'name': project})
+    except Exception as err:
+        raise Exception("Error deleting projects in db: ", err)
 
 def get_request_by_id(id):
     """
@@ -100,42 +134,6 @@ def get_request_by_id(id):
     requests = list(requests)  # if for some reason there are multiple matches
     
     return requests[0]
-
-@st.cache_data(ttl=100)
-def get_requests():
-    """
-    Retrieves the matched project for the connected user.
-    """
-    db = get_database()
-    
-    # pipeline to replace the project reference with the project name
-    pipeline = [
-        {
-            "$lookup": {
-                "from": "projects",            
-                "localField": "project",
-                "foreignField": "_id",
-                "as": "project"
-            }
-        },
-        {
-            "$project": { 
-                "_id": 0,
-            }
-        },
-        {
-            "$addFields": {
-                "project": "$project.name",
-            }
-        },
-        { "$unwind": "$project" }
-    ]
-    
-    requests = db['requests'].aggregate(pipeline)
-    
-    requests = list(requests)
-
-    return requests
 
 @st.cache_data(ttl=100)
 def get_requests_for_approval():
@@ -213,7 +211,7 @@ def get_my_requests():
 
     return requests
 
-def insert_request(title, request_objects):
+def insert_request(req_type, request_objects):
     """
     Inserts a new request to the database.
     """
@@ -225,10 +223,10 @@ def insert_request(title, request_objects):
     project = get_project()
     
     request = {
-        "title": title,
+        "type": req_type,
         "request_date": utc_datetime,
         "project": project["_id"],
-        "status": "AWAITING_APPROVAL",
+        "status": "APPROVAL_PENDING",
         "subject": subject,
         "request_objects": request_objects
     }
@@ -237,5 +235,9 @@ def insert_request(title, request_objects):
         new_request= db['requests'].insert_one(request)
     except Exception as err:
         raise Exception("Error inserting request to db: ", err)
+    
+    # clear the cache for the getter functions
+    get_requests_for_approval.clear()
+    get_my_requests.clear()
     
     return new_request

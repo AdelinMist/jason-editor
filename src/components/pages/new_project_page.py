@@ -4,7 +4,7 @@ import enum
 import re
 from pydantic import BaseModel, ValidationError
 from typing import List
-from mongo_db import insert_projects
+from mongo_db import upsert_projects, get_projects, delete_projects
 from utils.validation.project import Project
 
 def highlight_is_valid(val):
@@ -49,9 +49,13 @@ def submit_button_on_click(**kwargs):
     Handles submission of new project!
     """
     projects = kwargs["projects"]
+    projects_to_delete = st.session_state['deleted_projects']
     
     try:
-        insert_projects(projects)
+        upsert_projects(projects)
+        delete_projects(projects_to_delete)
+        
+        st.session_state['deleted_projects'] = [] # reset the deleted projects session state
         st.snow()
     except Exception as err:
         st.exception(err)
@@ -87,7 +91,10 @@ class NewProjectPage():
             df_row = pd.DataFrame.from_records([row])
             st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
             
-        for row_index in state["deleted_rows"]:
+        for row_index in state["deleted_rows"][::-1]:
+            if st.session_state[df_name].loc[row_index, 'is_valid']:
+                deleted_name = st.session_state[df_name].iloc[row_index]['name']
+                st.session_state['deleted_projects'].append(deleted_name)
             st.session_state[df_name].drop(row_index, inplace=True)
             
         st.session_state[df_name], st.session_state[dict_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
@@ -207,9 +214,19 @@ class NewProjectPage():
             # Create an empty DataFrame with column names
             st.session_state[error_df_name] = pd.DataFrame(columns=[*members])
             
+        if  dict_name not in st.session_state:
+            # Create an empty DataFrame with column names
+            st.session_state[dict_name] = {}
+            
+        if  'deleted_projects' not in st.session_state:
+            # Create an empty DataFrame with column names
+            st.session_state['deleted_projects'] = []
+            
         if  df_name not in st.session_state:
             # Create an empty DataFrame with column names
-            st.session_state[df_name] = pd.DataFrame(columns=[*members, 'is_valid'])
+            project_data = get_projects()
+            st.session_state[df_name] = pd.DataFrame(project_data, columns=[*members, 'is_valid'])
+            st.session_state[df_name], st.session_state[dict_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
             
         st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
@@ -236,7 +253,7 @@ class NewProjectPage():
         """
         Returns the page object as needed.
         """
-        url_pathname = 'new-project'
-        page_title = 'New Project'
-        page_icon = ':material/genetics:' 
+        url_pathname = 'projects'
+        page_title = 'Projects'
+        page_icon = ':material/sunny_snowing:' 
         return st.Page(self.run_page, title=page_title, icon=page_icon, url_path=url_pathname)
