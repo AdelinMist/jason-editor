@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import re
-from mongo_db import get_requests
+from mongo_db import get_my_requests
 
 class RequestsPage():
     """
@@ -13,10 +13,10 @@ class RequestsPage():
         The 'main' fucntion of each page. Runs everything.
         """
         
-        request_data = get_requests()
+        request_data = get_my_requests()
         request_df = pd.DataFrame(request_data)
         
-        st.subheader('Requests')
+        st.subheader('My Requests')
         st.dataframe(
             request_df,
             column_config={
@@ -37,5 +37,5 @@ class RequestsPage():
         """
         url_pathname = 'my-requests'
         page_title = 'My Requests'
-        page_icon = ':material/genetics:' # getting the default 
+        page_icon = ':material/genetics:' 
         return st.Page(self.run_page, title=page_title, icon=page_icon, url_path=url_pathname)

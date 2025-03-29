@@ -68,7 +68,7 @@ def get_project():
 @st.cache_data(ttl=600)
 def get_project_by_id(id):
     """
-    Retrieves the matched project for the connected user.
+    Retrieves the matched project by id.
     """
     db = get_database()
     projects = db['projects'].find( { '_id': { '$eq': id } } )
@@ -77,23 +77,29 @@ def get_project_by_id(id):
     
     return projects[0]
 
-def insert_project(name, groups):
+def insert_projects(projects):
     """
     Inserts a new project to the database.
     """
     db = get_database()
     
-    project = {
-        "name": name,
-        "groups": groups,
-    }
-    
     try:
-        new_project= db['projects'].insert_one(project)
+        new_projects = db['projects'].insert_many(projects)
     except Exception as err:
-        raise Exception("Error inserting project to db: ", err)
+        raise Exception("Error inserting projects to db: ", err)
     
-    return new_project
+    return new_projects
+
+def get_request_by_id(id):
+    """
+    Retrieves the matched request by id.
+    """
+    db = get_database()
+    requests = db['requests'].find( { '_id': { '$eq': id } } )
+    
+    requests = list(requests)  # if for some reason there are multiple matches
+    
+    return requests[0]
 
 @st.cache_data(ttl=100)
 def get_requests():
@@ -104,6 +110,82 @@ def get_requests():
     
     # pipeline to replace the project reference with the project name
     pipeline = [
+        {
+            "$lookup": {
+                "from": "projects",            
+                "localField": "project",
+                "foreignField": "_id",
+                "as": "project"
+            }
+        },
+        {
+            "$project": { 
+                "_id": 0,
+            }
+        },
+        {
+            "$addFields": {
+                "project": "$project.name",
+            }
+        },
+        { "$unwind": "$project" }
+    ]
+    
+    requests = db['requests'].aggregate(pipeline)
+    
+    requests = list(requests)
+
+    return requests
+
+@st.cache_data(ttl=100)
+def get_requests_for_approval():
+    """
+    Retrieves the matched project for the connected user.
+    """
+    db = get_database()
+    
+    # pipeline to replace the project reference with the project name
+    pipeline = [
+        { "$match" : { "status" : "APPROVAL_PENDING" } },
+        {
+            "$lookup": {
+                "from": "projects",            
+                "localField": "project",
+                "foreignField": "_id",
+                "as": "project"
+            }
+        },
+        {
+            "$project": { 
+                "_id": 0,
+            }
+        },
+        {
+            "$addFields": {
+                "project": "$project.name",
+            }
+        },
+        { "$unwind": "$project" }
+    ]
+    
+    requests = db['requests'].aggregate(pipeline)
+    
+    requests = list(requests)
+
+    return requests
+
+@st.cache_data(ttl=100)
+def get_my_requests():
+    """
+    Retrieves the matched requests for the connected user by project.
+    """
+    db = get_database()
+    
+    project = get_project()
+    
+    # pipeline to replace the project reference with the project name
+    pipeline = [
+        { "$match" : { "project" : { '$eq': project['_id'] } } },
         {
             "$lookup": {
                 "from": "projects",            

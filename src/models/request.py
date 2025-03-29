@@ -17,7 +17,7 @@ def get_validator():
                     "description": "must be a date and is required"
                 },
                 "status": {
-                    "enum": ["AWAITING_APPROVAL", "IN_PROGRESS", "COMPLETED", "FAILED"],
+                    "enum": ["APPROVAL_PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"],
                     "description": "can only be one of the enum values and \
                     is required"
                 },
