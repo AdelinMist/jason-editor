@@ -2,7 +2,7 @@ def get_validator():
     validator = {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["request_objects"], #"title", "subject", "request_date", "project", "status", 
+            "required": ["title", "subject", "request_date", "project", "status", "request_objects"],
             "properties": {
                 "title": {
                     "bsonType": "string",

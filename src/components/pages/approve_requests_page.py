@@ -141,7 +141,7 @@ def submit_button_on_click(**kwargs):
     
     
 
-class ServicePage():
+class ApproveRequestsPage():
     """
     This class exists to support the multipage architecture. This is a generic service type page.
     """
