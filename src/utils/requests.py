@@ -1,9 +1,9 @@
-from mongo_db import get_request_by_id
+from mongo_db import get_requests_by_id
 
-def execute_request(id):
-    request = get_request_by_id(id)
+def execute_requests(ids):
+    requests = get_requests_by_id(ids)
     
-    return True
+    return False
 
 def get_request_status(id):
     pass

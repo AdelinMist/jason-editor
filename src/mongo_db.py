@@ -124,12 +124,12 @@ def delete_projects(projects):
     except Exception as err:
         raise Exception("Error deleting projects in db: ", err)
 
-def get_request_by_id(id):
+def get_requests_by_id(ids):
     """
-    Retrieves the matched request by id.
+    Retrieves the matched requests by id.
     """
     db = get_database()
-    requests = db['requests'].find( { '_id': { '$eq': id } } )
+    requests = db['requests'].find( { '_id': { '$in': ids } } )
     
     requests = list(requests)  # if for some reason there are multiple matches
     
@@ -151,11 +151,6 @@ def get_requests_for_approval():
                 "localField": "project",
                 "foreignField": "_id",
                 "as": "project"
-            }
-        },
-        {
-            "$project": { 
-                "_id": 0,
             }
         },
         {
@@ -193,11 +188,6 @@ def get_my_requests():
             }
         },
         {
-            "$project": { 
-                "_id": 0,
-            }
-        },
-        {
             "$addFields": {
                 "project": "$project.name",
             }
@@ -210,6 +200,22 @@ def get_my_requests():
     requests = list(requests)
 
     return requests
+
+def update_requests(requests):
+    """
+    Updates requests in the database, inserts if no request exists.
+    """
+    db = get_database()
+    
+    try:
+        for request in requests:
+            db['requests'].update_one({'_id': { '$eq': request['_id'] }}, { "$set": request })
+    except Exception as err:
+        raise Exception("Error updating requests to db: ", err)
+    
+    # clear the cache for the getter functions
+    get_requests_for_approval.clear()
+    get_my_requests.clear()
 
 def insert_request(req_type, request_objects):
     """

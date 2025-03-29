@@ -1,17 +1,24 @@
 import streamlit as st
 import pandas as pd
-import re
-from mongo_db import upsert_projects, get_requests_for_approval
+from mongo_db import update_requests, get_requests_for_approval
+from utils.requests import execute_requests
 
-def approve_button_on_click(**kwargs):
+def approve_button_on_click():
     """
     Handles approval and execution of requests!
     """
-    request_objects = kwargs["request_objects"]
-    service_name = kwargs['service_name']
-    
+    selected_rows = st.session_state["approval_requests_selection_df"].selection.rows
+    requests_copy = st.session_state["approval_requests_df"].copy(deep=True)
+    df_dict = requests_copy.drop(columns=['project']).iloc[selected_rows]
+    requests_to_execute_ids = requests_copy.get('_id').tolist()
+
     try:
-        insert_request(service_name, request_objects)
+        exec_status = execute_requests(requests_to_execute_ids)
+        if exec_status:
+            df_dict = df_dict.assign(status='IN_PROGRESS').to_dict('records')
+        else:
+            df_dict = df_dict.assign(status='FAILED').to_dict('records')
+        update_requests(df_dict)
     except Exception as err:
         st.exception(err)
 
@@ -24,7 +31,6 @@ class ApproveRequestsPage():
         """
         Handles the submission of a new project to be added to the db.
         """
-
         st.button(
             label="Approve Requests",
             icon=":material/skull:",
@@ -37,11 +43,16 @@ class ApproveRequestsPage():
         The 'main' fucntion of each page. Runs everything.
         """
         request_data = get_requests_for_approval()
-        request_df = pd.DataFrame(request_data)
+        
+        st.session_state["approval_requests_df"] = pd.DataFrame(request_data)
+        columns_to_display = list(st.session_state["approval_requests_df"].columns)
+        
+        if '_id' in columns_to_display:
+            columns_to_display.remove('_id')
         
         st.subheader('Requests Awaiting Approval')
         requests = st.dataframe(
-            request_df,
+            st.session_state["approval_requests_df"],
             column_config={
                 "request_objects": st.column_config.JsonColumn(
                     "JSON Data",
@@ -49,15 +60,16 @@ class ApproveRequestsPage():
                     width="large",
                 ),
             },
-            key = "approval_requests_df",
+            key = "approval_requests_selection_df",
             on_select="rerun",
             selection_mode=["multi-row"],
             hide_index=False,
+            column_order=columns_to_display,
             use_container_width=False,
             width=10000,
         )
         
-        st.write(st.session_state["approval_requests_df"])
+        st.write(st.session_state["approval_requests_selection_df"])
         self.approve_requests()
         
     def get_page(self):
