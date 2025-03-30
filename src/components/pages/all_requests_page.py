@@ -18,8 +18,6 @@ def reexec_button_on_click():
             df_dict = df_dict.assign(status='IN_PROGRESS').to_dict('records')
         else:
             df_dict = df_dict.assign(status='FAILED').to_dict('records')
-            
-        print(df_dict)
         update_requests(df_dict)
     except Exception as err:
         st.exception(err)
