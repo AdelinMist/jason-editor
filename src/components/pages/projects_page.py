@@ -1,21 +1,12 @@
 import streamlit as st
 import pandas as pd
-import enum
+import math
 import re
 from pydantic import BaseModel, ValidationError
 from typing import List
 from mongo_db import upsert_projects, get_projects, delete_projects
 from utils.validation.project import Project
-
-def highlight_is_valid(val):
-    """
-    Returns CSS based on value.
-    """
-    if isinstance(val, bool):
-        color = 'green' if bool(val) else 'red'
-    else:
-        color = 'green' if val.lower() == 'true' else 'red'
-    return 'background-color: {}'.format(color)
+from utils.misc import highlight_is_valid
 
 def validate_df(df, validation_cls, error_df_name):
     """
@@ -23,7 +14,7 @@ def validate_df(df, validation_cls, error_df_name):
     Recreates the error dataframe based on current validation errors.
     Sets the 'is_valid' column on the dataframe based on validation results.
     """
-    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0]
+    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0].copy()
     ValidationClass = validation_cls
     # Wrap the data_schema into a helper class for validation
     class ValidationWrap(BaseModel):
@@ -49,6 +40,7 @@ def submit_button_on_click(**kwargs):
     Handles submission of new project!
     """
     projects = kwargs["projects"]
+    
     projects_to_delete = st.session_state['deleted_projects']
     
     try:
@@ -61,10 +53,10 @@ def submit_button_on_click(**kwargs):
         st.exception(err)
     
     
-class NewProjectPage():
+class ProjectsPage():
     """
-    This class exists to support the multipage architecture. This is a generic service type page.
-    """
+    This class exists to support the multipage architecture. This is a page to handle projects.
+    """ 
     def __init__(self):
         self.cls = {}
         self.cls['name'] = Project.__name__
@@ -89,6 +81,7 @@ class NewProjectPage():
                 
         for row in state["added_rows"]:
             df_row = pd.DataFrame.from_records([row])
+            df_row = df_row.assign(id='')
             st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
             
         for row_index in state["deleted_rows"][::-1]:
@@ -164,7 +157,7 @@ class NewProjectPage():
         if submit_disabled:
             st.error(f"The values are not valid!")
             st.subheader('Errors')
-            st.dataframe(st.session_state[error_df_name], use_container_width=True)
+            st.dataframe(st.session_state[error_df_name].drop(columns=['id']), use_container_width=True)
         else:
             st.success(f"The values are valid!")
             
@@ -202,7 +195,7 @@ class NewProjectPage():
                 f"{member.capitalize()}",
                 help=cls_obj.model_fields[member].description,
                 width="large",
-                required=True,
+                required=True
             )})
                 
         df_name = f"df_{cls_name}"
@@ -230,10 +223,15 @@ class NewProjectPage():
             
         st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
+        columns_to_display = list(st.session_state[df_name].columns)
+        if 'id' in columns_to_display:
+            columns_to_display.remove('id')
+            
         st.subheader('Editor')
         st.data_editor(
             st.session_state[styled_df_name],
             column_config=column_cfg,
+            column_order=columns_to_display,
             key=edited_df_name,
             disabled=["is_valid"],
             num_rows="dynamic",

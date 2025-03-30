@@ -5,7 +5,7 @@ from components.pages.service_page import ServicePage
 from components.pages.requests_page import MyRequestsPage
 from components.pages.all_requests_page import AllRequestsPage
 from components.pages.approve_requests_page import ApproveRequestsPage
-from components.pages.new_project_page import NewProjectPage
+from components.pages.projects_page import ProjectsPage
 
 if __name__ == '__main__':
     st.set_page_config(layout="wide")
@@ -25,11 +25,11 @@ if __name__ == '__main__':
     if bool(set(subject_groups) & set(admins_groups)):
         if not has_project:
             pages = {
-                "Admin": [NewProjectPage().get_page()]
+                "Admin": [ProjectsPage().get_page()]
             }
         else:
             pages = {
-                "Admin": [AllRequestsPage().get_page(), ApproveRequestsPage().get_page(), NewProjectPage().get_page()]
+                "Admin": [AllRequestsPage().get_page(), ApproveRequestsPage().get_page(), ProjectsPage().get_page()]
             }
     else:
         pages = {}

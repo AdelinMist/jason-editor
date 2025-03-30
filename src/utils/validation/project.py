@@ -1,8 +1,22 @@
 from pydantic import field_validator, Field, BaseModel
 from typing import Any
 import json
+from typing_extensions import Annotated
+from pydantic.functional_validators import AfterValidator, BeforeValidator
+from bson import ObjectId as _ObjectId
+
+
+def check_object_id(value: str) -> str:
+    if not _ObjectId.is_valid(value) and value != '':
+        raise ValueError('Invalid ObjectId')
+    return value
+
+
+ObjectId = Annotated[str, AfterValidator(check_object_id)]
 
 class Project(BaseModel):
+    
+    id: ObjectId = Field(description="The project object id.", default=None)
     
     name: str = Field(description="The project name.")  # the previous defined Enum class
     

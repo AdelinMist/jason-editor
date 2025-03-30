@@ -12,11 +12,12 @@ class MyRequestsPage():
         """
         The 'main' fucntion of each page. Runs everything.
         """
+        st.title("My Requests")
         
         request_data = get_my_requests()
         request_df = pd.DataFrame(request_data)
         
-        st.subheader('My Requests')
+        st.subheader('Requests')
         st.dataframe(
             request_df,
             column_config={

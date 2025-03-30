@@ -5,6 +5,7 @@ import models.request
 import json
 from logger import logger
 from datetime import datetime, timezone
+from bson import ObjectId
         
 # Initialize connection.
 # Uses st.cache_resource to only run once.
@@ -24,11 +25,11 @@ def init_project_collection(db):
         # Creating a new collection
         try:
             db.create_collection('projects')
-            db.projects.createIndex( { "name": 1 }, { "unique": "true" } )
         except Exception as e:
             logger.error(e)
             
     # Add the schema validation!
+    db['projects'].create_index("name", unique=True)
     db.command("collMod", "projects", validator=models.project.get_validator())
     
 def init_request_collection(db):
@@ -43,16 +44,6 @@ def init_request_collection(db):
             
     # Add the schema validation!
     db.command("collMod", "requests", validator=models.request.get_validator())
-
-
-# Pull data from the collection.
-# Uses st.cache_data to only rerun when the query changes or after 10 min.
-@st.cache_data(ttl=100)
-def get_data():
-    db = get_database()
-    items = db.mycollection.find()
-    items = list(items)  # make hashable for st.cache_data
-    return items
 
 @st.cache_data(ttl=100)
 def get_project():
@@ -86,8 +77,21 @@ def get_projects():
     Retrieves the matched project for the connected user.
     """
     db = get_database()
-
-    projects = db['projects'].find({}, {'_id': 0})
+    
+    pipeline = [
+        {
+            "$addFields": {
+                "id": { "$convert": { "input": "$_id", "to": "string" } }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0
+            }
+        }
+    ]
+    
+    projects = db['projects'].aggregate(pipeline)
     
     list_to_str = lambda kv: (kv[0], json.dumps(kv[1])) if kv[0]=='groups' else (kv[0], kv[1])
     
@@ -104,7 +108,12 @@ def upsert_projects(projects):
     
     try:
         for project in projects:
-            db['projects'].update_one({'name': { '$eq': project['name'] }}, { "$set": project }, upsert=True)
+            if project['id'] == '':
+                del project['id']
+                db['projects'].insert_one(project)
+            else:
+                project_id = ObjectId(project.pop('id'))
+                db['projects'].update_one({'_id': { '$eq': project_id }}, { "$set": project }, upsert=True)
     except Exception as err:
         raise Exception("Error upserting projects to db: ", err)
     
@@ -112,15 +121,15 @@ def upsert_projects(projects):
     get_projects.clear()
     get_project.clear()
     
-def delete_projects(projects):
+def delete_projects(project_ids):
     """
     Deletes projects in the database, by name.
     """
     db = get_database()
     
     try:
-        for project in projects:
-            db['projects'].delete_many({'name': project})
+        for project_id in project_ids:
+            db['projects'].delete_many({'_id': project_id})
     except Exception as err:
         raise Exception("Error deleting projects in db: ", err)
 
@@ -133,7 +142,7 @@ def get_requests_by_id(ids):
     
     requests = list(requests)  # if for some reason there are multiple matches
     
-    return requests[0]
+    return requests
 
 @st.cache_data(ttl=100)
 def get_all_requests():
@@ -155,6 +164,7 @@ def get_all_requests():
         {
             "$addFields": {
                 "project": "$project.name",
+                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -187,6 +197,7 @@ def get_requests_for_approval():
         {
             "$addFields": {
                 "project": "$project.name",
+                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -221,6 +232,7 @@ def get_my_requests():
         {
             "$addFields": {
                 "project": "$project.name",
+                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -240,6 +252,7 @@ def update_requests(requests):
     
     try:
         for request in requests:
+            request['_id'] = ObjectId(request['_id'])
             db['requests'].update_one({'_id': { '$eq': request['_id'] }}, { "$set": request })
     except Exception as err:
         raise Exception("Error updating requests to db: ", err)

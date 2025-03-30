@@ -8,21 +8,12 @@ from pydantic import BaseModel, ValidationError
 from typing import List
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from mongo_db import insert_request
+from utils.misc import highlight_is_valid
 
 # jinja2 setup for the json schema templates
 # loading the environment
 file_path = os.path.abspath(os.path.dirname(__file__))
 env = Environment(loader = FileSystemLoader(f"{file_path}/../../json_schema_templates"))
-
-def highlight_is_valid(val):
-    """
-    Returns CSS based on value.
-    """
-    if isinstance(val, bool):
-        color = 'green' if bool(val) else 'red'
-    else:
-        color = 'green' if val.lower() == 'true' else 'red'
-    return 'background-color: {}'.format(color)
 
 def validate_df(df, validation_cls, error_df_name):
     """
@@ -30,7 +21,7 @@ def validate_df(df, validation_cls, error_df_name):
     Recreates the error dataframe based on current validation errors.
     Sets the 'is_valid' column on the dataframe based on validation results.
     """
-    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0]
+    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0].copy()
     ValidationClass = validation_cls
     # Wrap the data_schema into a helper class for validation
     class ValidationWrap(BaseModel):

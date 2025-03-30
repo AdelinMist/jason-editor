@@ -10,7 +10,7 @@ def approve_button_on_click():
     selected_rows = st.session_state["approval_requests_selection_df"].selection.rows
     requests_copy = st.session_state["approval_requests_df"].copy(deep=True)
     df_dict = requests_copy.drop(columns=['project']).iloc[selected_rows]
-    requests_to_execute_ids = requests_copy.get('_id').tolist()
+    requests_to_execute_ids = df_dict.get('_id').tolist()
 
     try:
         exec_status = execute_requests(requests_to_execute_ids)
@@ -24,29 +24,18 @@ def approve_button_on_click():
 
 class ApproveRequestsPage():
     """
-    This class exists to support the multipage architecture. This is a generic service type page.
+    This class exists to support the multipage architecture. This is a page to approve requests.
     """
-    
-    def approve_requests(self):
-        """
-        Handles the submission of a new project to be added to the db.
-        """
-        st.button(
-            label="Approve Requests",
-            icon=":material/skull:",
-            on_click=approve_button_on_click,
-            kwargs={}
-        )
     
     def run_page(self):
         """
         The 'main' fucntion of each page. Runs everything.
         """
+        st.title("Approve Requests")
         request_data = get_requests_for_approval()
         
         st.session_state["approval_requests_df"] = pd.DataFrame(request_data)
         columns_to_display = list(st.session_state["approval_requests_df"].columns)
-        
         if '_id' in columns_to_display:
             columns_to_display.remove('_id')
         
@@ -70,7 +59,13 @@ class ApproveRequestsPage():
         )
         
         st.write(st.session_state["approval_requests_selection_df"])
-        self.approve_requests()
+        
+        st.button(
+            label="Approve Requests",
+            icon=":material/skull:",
+            on_click=approve_button_on_click,
+            kwargs={}
+        )
         
     def get_page(self):
         """
