@@ -7,10 +7,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy in the source code
 COPY src ./src
-EXPOSE 443
+EXPOSE 8443
 
 # Setup an app user so the container doesn't run as the root user, also add permission for /app to the new user
 RUN useradd app; chmod -R u+rwx .; chown -R app .
 USER app
 
-CMD ["streamlit", "run", "./src/platform-ui.py", "--server.port", "443"]
+CMD ["streamlit", "run", "./src/platform-ui.py", "--server.port", "8443"]

@@ -129,7 +129,7 @@ def delete_projects(project_ids):
     
     try:
         for project_id in project_ids:
-            db['projects'].delete_many({'_id': project_id})
+            db['projects'].delete_many({'_id': ObjectId(project_id)})
     except Exception as err:
         raise Exception("Error deleting projects in db: ", err)
 

@@ -8,13 +8,13 @@ from mongo_db import upsert_projects, get_projects, delete_projects
 from utils.validation.project import Project
 from utils.misc import highlight_is_valid
 
-def validate_df(df, validation_cls, error_df_name):
+def validate_df(df, validation_cls):
     """
     Runs a pydantic validation on the dataframe passed.
     Recreates the error dataframe based on current validation errors.
     Sets the 'is_valid' column on the dataframe based on validation results.
     """
-    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0].copy()
+    st.session_state["df_project_error"] = st.session_state["df_project_error"].iloc[0:0].copy()
     ValidationClass = validation_cls
     # Wrap the data_schema into a helper class for validation
     class ValidationWrap(BaseModel):
@@ -30,7 +30,7 @@ def validate_df(df, validation_cls, error_df_name):
         for err_inst in err.errors():
             invalid_index = err_inst['loc'][1]
             invalid_col = err_inst['loc'][2]
-            st.session_state[error_df_name].loc[invalid_index, invalid_col] = err_inst['msg']
+            st.session_state["df_project_error"].loc[invalid_index, invalid_col] = err_inst['msg']
             df.loc[invalid_index, 'is_valid'] = False
         
     return df, validated_dict
@@ -47,7 +47,9 @@ def submit_button_on_click(**kwargs):
         upsert_projects(projects)
         delete_projects(projects_to_delete)
         
-        st.session_state['deleted_projects'] = [] # reset the deleted projects session state
+        # trigger reset of the values from the db
+        del st.session_state['df_project']
+        del st.session_state['deleted_projects']
         st.snow()
     except Exception as err:
         st.exception(err)
@@ -69,30 +71,26 @@ class ProjectsPage():
         Runs the validation function on the newly changed dataframe.
         """
         cls_obj = self.cls['obj']
-        df_name = kwargs['df_name']
-        error_df_name = kwargs['error_df_name']
-        edited_df_name = kwargs['edited_df_name']
-        dict_name = kwargs['dict_name']
-        state = st.session_state[edited_df_name]
+        state = st.session_state["df_project_edited"]
         
         for index, updates in state["edited_rows"].items():
             for key, value in updates.items():
-                st.session_state[df_name].loc[st.session_state[df_name].index == index, key] = value
+                st.session_state["df_project"].loc[st.session_state["df_project"].index == index, key] = value
                 
         for row in state["added_rows"]:
             df_row = pd.DataFrame.from_records([row])
             df_row = df_row.assign(id='')
-            st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
+            st.session_state["df_project"] = pd.concat([st.session_state["df_project"], df_row], ignore_index=True)
             
         for row_index in state["deleted_rows"][::-1]:
-            if st.session_state[df_name].loc[row_index, 'is_valid']:
-                deleted_name = st.session_state[df_name].iloc[row_index]['name']
-                st.session_state['deleted_projects'].append(deleted_name)
-            st.session_state[df_name].drop(row_index, inplace=True)
+            if st.session_state["df_project"].loc[row_index, 'is_valid']:
+                deleted_id = st.session_state["df_project"].iloc[row_index]['id']
+                st.session_state['deleted_projects'].append(deleted_id)
+            st.session_state["df_project"].drop(row_index, inplace=True)
             
-        st.session_state[df_name], st.session_state[dict_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+        st.session_state["df_project"], st.session_state["dict_project"] = validate_df(st.session_state["df_project"], cls_obj)
         
-    def upload_file(self, df_name, error_df_name, dict_name):
+    def upload_file(self):
         """
         Handles file uploading into the app.
         """
@@ -130,13 +128,13 @@ class ProjectsPage():
                     dataframe.assign(is_valid=False)
                 
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
-                if dataframe.columns.to_list() == st.session_state[df_name].columns.to_list():
+                if dataframe.columns.to_list() == st.session_state["df_project"].columns.to_list():
                     try:
-                        st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
+                        st.session_state["df_project"] = pd.concat([st.session_state["df_project"], dataframe], ignore_index=True )
                     except Exception as err:
                         st.exception(err)
                     
-                    st.session_state[df_name], st.session_state[dict_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+                    st.session_state["df_project"], st.session_state["dict_project"] = validate_df(st.session_state["df_project"], cls_obj)
                     # this is a hack to make this whole function run once for each file uploaded.
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
                     
@@ -145,23 +143,23 @@ class ProjectsPage():
                     st.error("File didn't have the correct columns! Please load a matching file next time!")
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
         
-    def submit_new_project(self, df_name, error_df_name, dict_name):
+    def submit_new_project(self):
         """
         Handles the submission of a new project to be added to the db.
         """
         cls_name = self.cls['name']
         
         # handle download and data validity message
-        submit_disabled = False if st.session_state[df_name]['is_valid'].all() else True
+        submit_disabled = False if st.session_state["df_project"]['is_valid'].all() else True
         
         if submit_disabled:
             st.error(f"The values are not valid!")
             st.subheader('Errors')
-            st.dataframe(st.session_state[error_df_name].drop(columns=['id']), use_container_width=True)
+            st.dataframe(st.session_state["df_project_error"].drop(columns=['id']), use_container_width=True)
         else:
             st.success(f"The values are valid!")
             
-        dict_obj = st.session_state[dict_name]
+        dict_obj = st.session_state["dict_project"]
 
         submit_btn_name = f"submit_btn_{cls_name}"
         st.button(
@@ -198,54 +196,49 @@ class ProjectsPage():
                 required=True
             )})
                 
-        df_name = f"df_{cls_name}"
-        error_df_name = f"df_{cls_name}_error"
-        styled_df_name = f"df_{cls_name}_styled"
-        edited_df_name = f"df_{cls_name}_edited"
-        dict_name = f"dict_{cls_name}"
-        if  error_df_name not in st.session_state:
+        if  "df_project_error" not in st.session_state:
             # Create an empty DataFrame with column names
-            st.session_state[error_df_name] = pd.DataFrame(columns=[*members])
+            st.session_state["df_project_error"] = pd.DataFrame(columns=[*members])
             
-        if  dict_name not in st.session_state:
+        if  "dict_project" not in st.session_state:
             # Create an empty DataFrame with column names
-            st.session_state[dict_name] = {}
+            st.session_state["dict_project"] = {}
             
         if  'deleted_projects' not in st.session_state:
             # Create an empty DataFrame with column names
             st.session_state['deleted_projects'] = []
             
-        if  df_name not in st.session_state:
+        if  'df_project' not in st.session_state:
             # Create an empty DataFrame with column names
             project_data = get_projects()
-            st.session_state[df_name] = pd.DataFrame(project_data, columns=[*members, 'is_valid'])
-            st.session_state[df_name], st.session_state[dict_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+            st.session_state["df_project"] = pd.DataFrame(project_data, columns=[*members, 'is_valid'])
+            st.session_state["df_project"], st.session_state["dict_project"] = validate_df(st.session_state["df_project"], cls_obj)
             
-        st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
+        st.session_state["df_project_styled"] = st.session_state["df_project"].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
-        columns_to_display = list(st.session_state[df_name].columns)
+        columns_to_display = list(st.session_state["df_project"].columns)
         if 'id' in columns_to_display:
             columns_to_display.remove('id')
             
         st.subheader('Editor')
         st.data_editor(
-            st.session_state[styled_df_name],
+            st.session_state["df_project_styled"],
             column_config=column_cfg,
             column_order=columns_to_display,
-            key=edited_df_name,
+            key="df_project_edited",
             disabled=["is_valid"],
             num_rows="dynamic",
             hide_index=False,
             on_change=self.data_editor_on_change,
-            kwargs={'cls_name': cls_name, 'cls_obj': cls_obj, 'df_name': df_name, 'edited_df_name': edited_df_name, 'error_df_name': error_df_name, 'dict_name': dict_name},
+            kwargs={'cls_name': cls_name, 'cls_obj': cls_obj},
             use_container_width=False,
             width=10000,
         )
         
-        self.upload_file(df_name, error_df_name, dict_name)
+        self.upload_file()
         
-        if not st.session_state[df_name].empty:
-            self.submit_new_project(df_name, error_df_name, dict_name)
+        if not st.session_state["df_project"].empty:
+            self.submit_new_project()
         
     def get_page(self):
         """
