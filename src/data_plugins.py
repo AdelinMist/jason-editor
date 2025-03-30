@@ -1,7 +1,7 @@
 import enum
 import os, sys
 import importlib
-from logger import logger
+from utils.logger import logger
 
 def import_from_path(module_name, file_path):
     """Import a module given its name and file path."""

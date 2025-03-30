@@ -3,7 +3,7 @@ import pymongo
 import models.project
 import models.request
 import json
-from logger import logger
+from utils.logger import logger
 from datetime import datetime, timezone
 from bson import ObjectId
         
