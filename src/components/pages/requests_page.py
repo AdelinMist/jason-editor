@@ -68,7 +68,6 @@ class RequestsPage():
                 validated_dict.append(validated_obj)
             except ValidationError as err:
                 for err_inst in err.errors():
-                    print(err_inst)
                     invalid_col = err_inst['loc'][0]
                     st.session_state[self.error_df_name].loc[index, invalid_col] = err_inst['msg']
         
