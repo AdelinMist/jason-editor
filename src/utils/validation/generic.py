@@ -20,7 +20,7 @@ class CustomBaseModel(BaseModel):
         populate_by_name=True
     )
     
-    id: Optional[ObjectId] = Field(description="The object id.", alias="_id")
+    id: Optional[ObjectId] = Field(description="The object id.", alias="_id", default=None)
     
     project: Optional[ObjectId] = Field(description="The associated object's object id.", default_factory=default_project_factory) 
 
@@ -31,7 +31,7 @@ class CustomBaseModel(BaseModel):
         model_dump = super().model_dump(**kwargs)
 
         # if field is None, dont return it!
-        none_fields = ['project', 'id', '_id']
+        none_fields = []
         none_fields = list(set(none_fields) & set(model_dump.keys()))
         for field in none_fields:
             if model_dump[field] == None:

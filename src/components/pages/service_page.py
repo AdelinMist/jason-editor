@@ -52,7 +52,6 @@ class ServicePage():
         """
         validation_cls = self.cls['obj']
         try:
-            print(obj)
             raw_obj = validation_cls(**obj)
             validated_obj = raw_obj.model_dump(object_id_to_str=True)
         except ValidationError as err:
@@ -196,10 +195,11 @@ class ServicePage():
                 dataframe = dataframe.astype(str)
                 
                 dataframe = self.validate_df(dataframe)
+                print(dataframe)
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
                 if dataframe.columns.to_list() == st.session_state[self.df_name].columns.to_list():
                     try:
-                        st.session_state[self.df_name] = pd.concat([st.session_state[self.df_name], dataframe], ignore_index=True )
+                        st.session_state[self.df_name] = pd.concat([st.session_state[self.df_name], dataframe], ignore_index=True ).replace({np.nan: None})
                         st.session_state[self.added_set_name].add(st.session_state[self.df_name].last_valid_index())
                     except Exception as err:
                         st.exception(err)
@@ -242,7 +242,7 @@ class ServicePage():
         """
         This function simply gets the data already existing in the db for this page.
         """
-        return [get_my_service_objects(self.snake_case_name)]
+        return get_my_service_objects(self.snake_case_name)
     
     def run_page(self):
         """
