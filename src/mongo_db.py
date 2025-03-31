@@ -26,9 +26,8 @@ def init_projects_collection(db):
         except Exception as e:
             logger.error(e)
             
-    # Add the schema validation!
+    # add a unique index for name!
     db['projects'].create_index("name", unique=True)
-    # db.command("collMod", "projects", validator=models.project.get_validator())
     
 def init_requests_collection(db):
     """
@@ -42,9 +41,6 @@ def init_requests_collection(db):
             db.create_collection('requests')
         except Exception as e:
             logger.error(e)
-            
-    # Add the schema validation!
-    # db.command("collMod", "requests", validator=models.request.get_validator())
     
 def init_service_collection(coll_name):
     db = get_database()

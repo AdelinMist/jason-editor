@@ -69,7 +69,7 @@ def upsert_projects(projects: List[Project]):
     Updates projects in the database, inserts if no project exists.
     """
     db = get_database()
-    projects = [project.model_dump() for project in projects] # dump model data
+    projects = [project.model_dump(groups_to_str=False) for project in projects] # dump model data
     
     try:
         for project in projects:
@@ -87,14 +87,18 @@ def upsert_projects(projects: List[Project]):
     get_project.clear()
 
 @validate_call
-def delete_projects(project_ids: List[ObjectId]):
+def delete_projects(projects: List[Project]):
     """
     Deletes projects in the database, by name.
     """
     db = get_database()
+    projects = [project.model_dump(groups_to_str=False) for project in projects]
     
     try:
-        for project_id in project_ids:
-            db['projects'].delete_many({'_id': _ObjectId(project_id)})
+        for project in projects:
+            db['projects'].delete_many({'_id': project['id']})
     except Exception as err:
         raise Exception("Error deleting projects in db: ", err)
+    
+    get_projects.clear()
+    get_project.clear()

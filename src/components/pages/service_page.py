@@ -2,112 +2,29 @@ import streamlit as st
 import pandas as pd
 import enum
 import re
-import json
-import os
+import numpy as np
 from pydantic import ValidationError
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+from jinja2 import TemplateNotFound
 from db.requests import insert_request
 from mongo_db import init_service_collection
 from utils.misc import highlight_is_valid
 from utils.validation.request import ActionType
-from db.services import get_my_service_objects,  upsert_services
-
-# jinja2 setup for the json schema templates
-# loading the environment
-file_path = os.path.abspath(os.path.dirname(__file__))
-env = Environment(loader = FileSystemLoader(f"{file_path}/../../json_schema_templates"))
-
-def validate_obj(obj, validation_cls):
-    """
-    Runs a pydantic validation on the object passed.
-    """
-    try:
-        raw_obj = validation_cls(**obj)
-        validated_obj = raw_obj.model_dump()
-    except ValidationError as err:
-        raise err
-        
-    return validated_obj, raw_obj
-
-def validate_df(df, validation_cls, error_df_name):
-    """
-    Runs a pydantic validation on the dataframe passed.
-    Recreates the error dataframe based on current validation errors.
-    Sets the 'is_valid' column on the dataframe based on validation results.
-    """
-    st.session_state[error_df_name] = st.session_state[error_df_name].iloc[0:0].copy()
-
-    df = df.assign(is_valid=True)
-    
-    df_dict = df.loc[:, df.columns != 'is_valid'].to_dict(orient="records")
-    validated_dict = []
-    raw_dict = []
-    
-    for index, obj in enumerate(df_dict):
-        try:
-            validated_obj, raw_obj = validate_obj(obj, validation_cls)
-            validated_dict.append(validated_obj)
-            raw_dict.append(raw_obj)
-        except ValidationError as err:
-            for err_inst in err.errors():
-                invalid_col = err_inst['loc'][0]
-                st.session_state[error_df_name].loc[index, invalid_col] = err_inst['msg']
-                df.loc[index, 'is_valid'] = False
-    
-    if st.session_state[error_df_name].empty:
-        st.session_state["temp"] = raw_dict
-        df = pd.DataFrame.from_records(validated_dict).assign(is_valid=True)
-        
-    return df
-    
-def download_button_on_click():
-    """
-    Stupid function that shows snow on screen when the download button is clicked!
-    """
-    st.snow()
-    
-def render_jinja(template_name, **kwargs):
-    """
-    Renders the json schema template with the values from the dataframe row
-    """
-    # loading the template
-    template = env.get_template(template_name)
-
-    # rendering the template and storing the resultant text in variable output
-    output = template.render(**kwargs)
-    
-    return output
+from db.services import get_my_service_objects
 
 @st.cache_data
-def convert_to_dict(df, cls):
+def convert_to_records(df):
     """
-    Converts the dataframe to a dict object.
+    Converts the dataframe to a list of objects.
     Also replaces the string 'None' values with empty strings.
     This functions result is cached.
     This is for request submission into the db.
     """
-    df_to_convert = df.copy(deep=True).replace('None', '').drop(columns=['is_valid'])
-    
-    if hasattr(cls['obj'], f"_{cls['name']}__json_schema_template_name"):
-        template_name = getattr(cls['obj'], f"_{cls['name']}__json_schema_template_name").default
-    else:
-        template_name = f"{cls['name']}.jinja"
+    record_list = df.copy(deep=True).drop(columns=['is_valid']).to_dict('records')
 
-    json_list = []
-    mapping =  dict.fromkeys(range(32)) # the json control chars
-    for row in df_to_convert.to_dict('records'):
-        try:
-            # we also remove json control chars from the result of templating!
-            rendered_schema = render_jinja(template_name, **row).translate(mapping)
-            json_to_add = json.loads(rendered_schema)
-        except TemplateNotFound as err:
-            json_to_add = row
-            
-        json_list.append(json_to_add)
+    # get rid of None values
+    record_list = [ {key:val for key, val in record.items() if val != None} for record in record_list ] 
 
-    
-    return json_list
-    
+    return record_list
 
 class ServicePage():
     """
@@ -118,92 +35,133 @@ class ServicePage():
         split_name = re.sub( r"([A-Z])", r" \1", self.cls['name']).split()
         lower_split_name = [word.lower() for word in split_name]
         
+        self.page_title = ' '.join(split_name)
+        
         ### init the db collection
-        coll_name = '_'.join(lower_split_name)
-        self.coll_name = coll_name
-        init_service_collection(coll_name)
+        snake_case_name = '_'.join(lower_split_name)
+        self.snake_case_name = snake_case_name
+        init_service_collection(snake_case_name)
         
         ### return page object
         self.url_pathname = '-'.join(lower_split_name)
         self.page_title = ' '.join(split_name)
         
-    def submit_button_on_click(self, **kwargs):
+    def validate_obj(self, obj):
+        """
+        Runs a pydantic validation on the object passed.
+        """
+        validation_cls = self.cls['obj']
+        try:
+            print(obj)
+            raw_obj = validation_cls(**obj)
+            validated_obj = raw_obj.model_dump(object_id_to_str=True)
+        except ValidationError as err:
+            raise err
+            
+        return validated_obj
+
+    def validate_df(self, df):
+        """
+        Runs a pydantic validation on the dataframe passed.
+        Recreates the error dataframe based on current validation errors.
+        Sets the 'is_valid' column on the dataframe based on validation results.
+        """
+        st.session_state[self.error_df_name] = st.session_state[self.error_df_name].iloc[0:0].copy()
+        
+        df = df.assign(is_valid=True)
+        
+        df_dict = df.loc[:, df.columns != 'is_valid'].to_dict(orient="records")
+        validated_dict = []
+        
+        for index, obj in enumerate(df_dict):
+            try:
+                validated_obj = self.validate_obj(obj)
+                validated_dict.append(validated_obj)
+            except ValidationError as err:
+                for err_inst in err.errors():
+                    invalid_col = err_inst['loc'][0]
+                    st.session_state[self.error_df_name].loc[index, invalid_col] = err_inst['msg']
+                    df.loc[index, 'is_valid'] = False
+        
+        if st.session_state[self.error_df_name].empty:
+            df = pd.DataFrame.from_records(validated_dict).assign(is_valid=True).replace({np.nan: None})
+            
+        return df
+    
+    def submit_logic(self, submitted_objects, action_type):
+        """
+        Handles the submission logic itself, based on the action type.
+        """
+        if action_type == ActionType.CREATE:
+            insert_request(self.snake_case_name, ActionType.CREATE, submitted_objects)
+        elif action_type == ActionType.UPDATE:
+            insert_request(self.snake_case_name, ActionType.UPDATE, submitted_objects)
+        elif action_type == ActionType.DELETE:
+            insert_request(self.snake_case_name, ActionType.DELETE, submitted_objects)
+        
+    def submit_button_on_click(self):
         """
         Handles submission on new request!
         """
         
-        validation_cls = kwargs['validation_cls'] 
-        df_name = kwargs['df_name']
-        deleted_df_name = kwargs['deleted_df_name']
-        added_set_name = kwargs['added_set_name']
-        edited_set_name = kwargs['edited_set_name']
-        service_name = kwargs['service_name']
+        added_indices = st.session_state[self.df_name].index.isin(st.session_state[self.added_set_name])
+        added_objects = st.session_state[self.df_name].loc[added_indices]
+        added_objects = convert_to_records(added_objects)
         
-        added_indices = st.session_state[df_name].index.isin(st.session_state[added_set_name])
-        added_objects = st.session_state[df_name].loc[added_indices]
-        added_objects = convert_to_dict(added_objects, validation_cls)
-        
-        edited_indices = st.session_state[df_name].index.isin(st.session_state[edited_set_name])
-        edited_objects = st.session_state[df_name].loc[edited_indices]
-        edited_objects = convert_to_dict(edited_objects, validation_cls)
+        edited_indices = st.session_state[self.df_name].index.isin(st.session_state[self.edited_set_name])
+        edited_objects = st.session_state[self.df_name].loc[edited_indices]
+        edited_objects = convert_to_records(edited_objects)
 
-        objects_to_delete = convert_to_dict(st.session_state[deleted_df_name], validation_cls)
+        objects_to_delete = convert_to_records(st.session_state[self.deleted_df_name])
         
         try:
             if len(added_objects) != 0:
-                insert_request(service_name, ActionType.CREATE, added_objects)
-                upsert_services(st.session_state["temp"], self.coll_name)
-                del st.session_state[added_set_name]
+                self.submit_logic(added_objects, ActionType.CREATE)
+                del st.session_state[self.added_set_name]
                 
             if len(edited_objects) != 0:
-                insert_request(service_name, ActionType.UPDATE, edited_objects)
-                del st.session_state[edited_set_name]
+                self.submit_logic(edited_objects, ActionType.UPDATE)
+                del st.session_state[self.edited_set_name]
                 
             if len(objects_to_delete) != 0:
-                insert_request(service_name, ActionType.DELETE, objects_to_delete)
-                del st.session_state[deleted_df_name]
+                self.submit_logic(objects_to_delete, ActionType.DELETE)
+                del st.session_state[self.deleted_df_name]
                 
-            del st.session_state[df_name]
+            del st.session_state[self.df_name]
                 
         except Exception as err:
             st.exception(err)
         
-    def data_editor_on_change(self, **kwargs):
+    def data_editor_on_change(self):
         """
         Runs on change of the data editor component.
         Handles the changed data, and updates the relevant dataframe.
         Runs the validation function on the newly changed dataframe.
         """
         cls_obj = self.cls['obj']
-        df_name = kwargs['df_name']
-        error_df_name = kwargs['error_df_name']
-        edited_df_name = kwargs['edited_df_name']
-        added_set_name = kwargs['added_set_name']
-        edited_set_name = kwargs['edited_set_name']
-        deleted_df_name = kwargs['deleted_df_name']
-        state = st.session_state[edited_df_name]
+        state = st.session_state[self.edited_df_name]
         
         for index, updates in state["edited_rows"].items():
-            if index not in st.session_state[added_set_name]:
-                st.session_state[edited_set_name].add(index)
+            if index not in st.session_state[self.added_set_name]:
+                st.session_state[self.edited_set_name].add(index)
             for key, value in updates.items():
-                st.session_state[df_name].loc[st.session_state[df_name].index == index, key] = value
+                st.session_state[self.df_name].loc[st.session_state[self.df_name].index == index, key] = value
                 
         for row in state["added_rows"]:
             df_row = pd.DataFrame.from_records([row])
-            st.session_state[df_name] = pd.concat([st.session_state[df_name], df_row], ignore_index=True)
-            st.session_state[added_set_name].add(st.session_state[df_name].last_valid_index())
+            st.session_state[self.df_name] = pd.concat([st.session_state[self.df_name], df_row], ignore_index=True).replace({np.nan: None})
+            st.session_state[self.added_set_name].add(st.session_state[self.df_name].last_valid_index())
             
         for row_index in state["deleted_rows"]:
             # add deleted object to a list that will be made into a DELETE action request
-            if st.session_state[df_name].loc[row_index, 'is_valid']:
-                deleted_row = st.session_state[df_name].loc[row_index].copy()
-                st.session_state[deleted_df_name] = pd.concat([st.session_state[deleted_df_name], deleted_row.to_frame().T], ignore_index=True)
-            st.session_state[df_name].drop(row_index, inplace=True)
-            
-        st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+            if st.session_state[self.df_name].loc[row_index, 'is_valid']:
+                deleted_row = st.session_state[self.df_name].loc[row_index].copy()
+                st.session_state[self.deleted_df_name] = pd.concat([st.session_state[self.deleted_df_name], deleted_row.to_frame().T], ignore_index=True)
+            st.session_state[self.df_name].drop(row_index, inplace=True)
+
+        st.session_state[self.df_name] = self.validate_df(st.session_state[self.df_name])
         
-    def upload_file(self, df_name, error_df_name, added_set_name):
+    def upload_file(self):
         """
         Handles file uploading into the app.
         """
@@ -237,16 +195,16 @@ class ServicePage():
                 
                 dataframe = dataframe.astype(str)
                 
-                dataframe = validate_df(dataframe, cls_obj, error_df_name)
+                dataframe = self.validate_df(dataframe)
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
-                if dataframe.columns.to_list() == st.session_state[df_name].columns.to_list():
+                if dataframe.columns.to_list() == st.session_state[self.df_name].columns.to_list():
                     try:
-                        st.session_state[df_name] = pd.concat([st.session_state[df_name], dataframe], ignore_index=True )
-                        st.session_state[added_set_name].add(st.session_state[df_name].last_valid_index())
+                        st.session_state[self.df_name] = pd.concat([st.session_state[self.df_name], dataframe], ignore_index=True )
+                        st.session_state[self.added_set_name].add(st.session_state[self.df_name].last_valid_index())
                     except Exception as err:
                         st.exception(err)
                     
-                    st.session_state[df_name] = validate_df(st.session_state[df_name], cls_obj, error_df_name)
+                    st.session_state[self.df_name] = self.validate_df(st.session_state[self.df_name])
                     # this is a hack to make this whole function run once for each file uploaded.
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
                     
@@ -255,20 +213,19 @@ class ServicePage():
                     st.error("File didn't have the correct columns! Please load a matching file next time!")
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
         
-    def submit_request(self, df_name, error_df_name, deleted_df_name, added_set_name, edited_set_name):
+    def submit_request(self):
         """
         Handles the submission of a request.
         """
         cls_name = self.cls['name']
-        cls_obj = self.cls['obj']
         
         # handle download and data validity message
-        submit_disabled = False if st.session_state[df_name]['is_valid'].all() else True
+        submit_disabled = False if st.session_state[self.df_name]['is_valid'].all() else True
         
         if submit_disabled:
             st.error(f"The values are not valid!")
             st.subheader('Errors')
-            st.dataframe(st.session_state[error_df_name], use_container_width=True)
+            st.dataframe(st.session_state[self.error_df_name], use_container_width=True)
         else:
             st.success(f"The values are valid!")
 
@@ -278,9 +235,14 @@ class ServicePage():
             key=submit_btn_name,
             icon=":material/skull:",
             disabled=submit_disabled,
-            on_click=self.submit_button_on_click,
-            kwargs={'service_name': cls_name, 'added_set_name': added_set_name, 'edited_set_name': edited_set_name, 'df_name': df_name, 'deleted_df_name': deleted_df_name, 'validation_cls': self.cls}
+            on_click=self.submit_button_on_click
         )
+        
+    def get_page_data(self):
+        """
+        This function simply gets the data already existing in the db for this page.
+        """
+        return [get_my_service_objects(self.snake_case_name)]
     
     def run_page(self):
         """
@@ -290,11 +252,10 @@ class ServicePage():
         cls_obj = self.cls['obj']
         members = list(cls_obj.model_fields.keys())
         
-        split_name = re.sub( r"([A-Z])", r" \1", cls_name).split()
-        page_title = ' '.join(split_name)
-        st.title(page_title)
+        st.title(self.page_title)
         
-        # Set up column config with the selectbox for Enum attributes
+        ### Set up column config with the selectbox for Enum attributes
+        
         column_cfg={
             "is_valid": st.column_config.TextColumn("IsValid", width="medium", default=False),
         }
@@ -321,39 +282,45 @@ class ServicePage():
                     width="medium",
                     required=True,
                 )})
-                
+        
+        ### session data setup
+        
         df_columns = list([*members, 'is_valid'])
                 
-        df_name = f"df_{cls_name}"
-        error_df_name = f"df_{cls_name}_error"
-        styled_df_name = f"df_{cls_name}_styled"
-        edited_df_name = f"df_{cls_name}_edited"
-        added_set_name = f"added_set_{cls_name}"
-        edited_set_name = f"edited_set_{cls_name}"
-        deleted_df_name = f"df_{cls_name}_deleted"
-        if  error_df_name not in st.session_state:
+        self.df_name = f"df_{cls_name}"
+        self.error_df_name = f"df_{cls_name}_error"
+        self.styled_df_name = f"df_{cls_name}_styled"
+        self.edited_df_name = f"df_{cls_name}_edited"
+        self.added_set_name = f"added_set_{cls_name}"
+        self.edited_set_name = f"edited_set_{cls_name}"
+        self.deleted_df_name = f"df_{cls_name}_deleted"
+        
+        if  self.error_df_name not in st.session_state:
             # Create an empty DataFrame with column names
-            st.session_state[error_df_name] = pd.DataFrame(columns=[*members])
+            st.session_state[self.error_df_name] = pd.DataFrame(columns=[*members])
             
-        if  added_set_name not in st.session_state:
+        if  self.added_set_name not in st.session_state:
             # Create an empty set
-            st.session_state[added_set_name] = set()
+            st.session_state[self.added_set_name] = set()
             
-        if  edited_set_name not in st.session_state:
+        if  self.edited_set_name not in st.session_state:
             # Create an empty set
-            st.session_state[edited_set_name] = set()
+            st.session_state[self.edited_set_name] = set()
             
-        if  deleted_df_name not in st.session_state:
+        if  self.deleted_df_name not in st.session_state:
             # Create an empty DataFrame with column names
-            st.session_state[deleted_df_name] = pd.DataFrame(columns=df_columns)
+            st.session_state[self.deleted_df_name] = pd.DataFrame(columns=df_columns)
             
-        if  df_name not in st.session_state or st.session_state[df_name].empty:
+        if  self.df_name not in st.session_state or st.session_state[self.df_name].empty:
             # Create a DataFrame
             # get service objects in db
-            service_objects = get_my_service_objects(self.coll_name)
-            st.session_state[df_name] = pd.DataFrame(service_objects, columns=df_columns)
+            service_objects = self.get_page_data()
+            service_objects_df = pd.DataFrame.from_records(service_objects)
+            if not service_objects_df.empty:
+                service_objects_df = self.validate_df(service_objects_df)
+            st.session_state[self.df_name] = pd.DataFrame(service_objects_df, columns=df_columns).astype(str)
         
-        st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
+        st.session_state[self.styled_df_name] = st.session_state[self.df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
         columns_to_display = df_columns
         if 'id' in columns_to_display:
@@ -361,26 +328,25 @@ class ServicePage():
         
         if 'project' in columns_to_display:
             columns_to_display.remove('project')
-            
+        
         st.subheader('Editor')
         st.data_editor(
-            st.session_state[styled_df_name],
+            st.session_state[self.styled_df_name],
             column_config=column_cfg,
             column_order=columns_to_display,
-            key=edited_df_name,
+            key=self.edited_df_name,
             disabled=["is_valid"],
             num_rows="dynamic",
             hide_index=False,
             on_change=self.data_editor_on_change,
-            kwargs={'cls_name': cls_name, 'cls_obj': cls_obj, 'df_name': df_name, 'edited_df_name': edited_df_name, 'error_df_name': error_df_name, 'added_set_name': added_set_name, 'edited_set_name': edited_set_name, 'deleted_df_name': deleted_df_name},
             use_container_width=False,
             width=10000,
         )
 
-        self.upload_file(df_name, error_df_name, added_set_name)
+        self.upload_file()
         
-        if not st.session_state[df_name].empty or not st.session_state[deleted_df_name].empty:
-            self.submit_request(df_name, error_df_name, deleted_df_name, added_set_name, edited_set_name)
+        if not st.session_state[self.df_name].empty or not st.session_state[self.deleted_df_name].empty:
+            self.submit_request()
         
     def get_page(self):
         """

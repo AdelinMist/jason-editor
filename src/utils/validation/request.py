@@ -17,6 +17,9 @@ class StatusType(Enum):
     FAILED = 'FAILED'
 
 class Request(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
     
     id: Optional[ObjectId] = Field(description="The request object id.", alias="_id", default=None)
     
@@ -35,19 +38,24 @@ class Request(BaseModel):
     request_objects: conlist(dict, min_length=1) = Field(description="The request objects, in the form of a list of objects. \
         These will be passed to the backend in an API call!")
     
-    def model_dump(self, **kwargs):
+    def model_dump(self, object_id_to_str = False, **kwargs):
         """
         This method overloads the model dump method to return true ObjectIDs.
         """
         model_dump = super().model_dump(**kwargs)
         
-        # if _id is None, dont return it!
-        if model_dump['_id'] == None:
-            del model_dump['_id']
+        # if field is None, dont return it!
+        none_fields = ['id', '_id']
+        none_fields = list(set(none_fields) & set(model_dump.keys()))
+        for field in none_fields:
+            if model_dump[field] == None:
+                del model_dump[field]
             
-        objectIdFields = ['project']
-        for field in objectIdFields:
-            model_dump[field] = _ObjectId(model_dump[field])
+        if not object_id_to_str:
+            object_id_fields = ['project', 'id', '_id']
+            object_id_fields = list(set(object_id_fields) & set(model_dump.keys()))
+            for field in object_id_fields:
+                model_dump[field] = _ObjectId(model_dump[field])
             
         for key, value in model_dump.items():
             if isinstance(value, Enum):

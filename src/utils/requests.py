@@ -1,7 +1,6 @@
 from db.requests import get_requests_by_id
 
-def execute_requests(ids):
-    requests = get_requests_by_id(ids)
+def execute_requests(requests):
     
     return True
 

@@ -37,7 +37,7 @@ def get_all_requests():
         },
         {
             "$addFields": {
-                "project": "$project.name",
+                "project": "$project._id",
                 "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
@@ -70,7 +70,7 @@ def get_requests_for_approval():
         },
         {
             "$addFields": {
-                "project": "$project.name",
+                "project": "$project._id",
                 "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
@@ -105,7 +105,7 @@ def get_my_requests():
         },
         {
             "$addFields": {
-                "project": "$project.name",
+                "project": "$project._id",
                 "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
@@ -124,7 +124,7 @@ def update_requests(requests: List[Request]):
     Updates requests in the database, inserts if no request exists.
     """
     db = get_database()
-    requests = [request.model_dump() for request in requests] # dump model data
+    requests = [request.model_dump(by_alias=True) for request in requests] # dump model data
     
     try:
         for request in requests:

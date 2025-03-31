@@ -1,11 +1,16 @@
+from enum import Enum
 from pydantic import field_validator, Field, BaseModel, ConfigDict
-from typing import Any
+from typing import Any, Optional
 import json
+from bson import ObjectId as _ObjectId
 from utils.validation.types import ObjectId
 
 class Project(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True
+    )
     
-    id: ObjectId = Field(description="The project object id.", serialization_alias="_id", default=None)
+    id: Optional[ObjectId] = Field(description="The project object id.", alias="_id", default=None)
     
     name: str = Field(description="The project name.")  # the previous defined Enum class
     
@@ -32,3 +37,31 @@ class Project(BaseModel):
             return [value]
         else:
             return value
+        
+    def model_dump(self, object_id_to_str = False, groups_to_str = True, **kwargs):
+        """
+        This method overloads the model dump method to return the Enum values themselves, when printing the model object.
+        """
+        model_dump = super().model_dump(**kwargs)
+
+        # if field is None, dont return it!
+        none_fields = []
+        none_fields = list(set(none_fields) & set(model_dump.keys()))
+        for field in none_fields:
+            if model_dump[field] == None:
+                del model_dump[field]
+            
+        if not object_id_to_str:
+            object_id_fields = ['id', '_id']
+            object_id_fields = list(set(object_id_fields) & set(model_dump.keys()))
+            for field in object_id_fields:
+                model_dump[field] = _ObjectId(model_dump[field])
+                
+        if groups_to_str:
+            model_dump['groups'] = json.dumps(model_dump['groups'])
+            
+        for key, value in model_dump.items():
+            if isinstance(value, Enum):
+                model_dump[key] = value.value
+                
+        return model_dump

@@ -1,14 +1,13 @@
 import streamlit as st
-from datetime import datetime, timezone
 from bson.objectid import ObjectId
 from mongo_db import get_database
 from db.projects import get_project
 from pydantic import BaseModel, validate_call
 from typing import List
-from utils.validation.request import Request, ActionType, StatusType
+import validation
 
 @st.cache_data(ttl=100)
-def get_my_service_objects(service_name: str):
+def get_my_service_objects(service_name: str) -> List:
     """
     Retrieves the matched service objects for the connected user by project.
     """
@@ -29,9 +28,14 @@ def get_my_service_objects(service_name: str):
         },
         {
             "$addFields": {
-                "project": "$project.name",
-                "_id": { "$convert": { "input": "$_id", "to": "string" } }
+                "project": "$project._id",
+                "id": { "$convert": { "input": "$_id", "to": "string" } }
             }
+        },
+        {
+            "$project": {
+                "_id": 0
+            }    
         },
         { "$unwind": "$project" }
     ]
@@ -39,7 +43,7 @@ def get_my_service_objects(service_name: str):
     service_objects = db[service_name].aggregate(pipeline)
     
     service_objects = list(service_objects)
-    print(service_objects)
+    
     return service_objects
 
 @validate_call
@@ -55,8 +59,9 @@ def upsert_services(services: List[BaseModel], service_name: str):
     services = [service.model_dump(by_alias=True) for service in services] # dump model data
     
     try:
+        print("Services")
         for service in services:
-            service['project'] = ObjectId(service['project'])
+            print(service)
             if service['_id'] == None:
                 del service['_id']
                 db[service_name].insert_one(service)
