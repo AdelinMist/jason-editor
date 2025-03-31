@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-import re
-from mongo_db import get_my_requests
+from db.requests import get_my_requests
 
 class MyRequestsPage():
     """

@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-import math
 import re
 from pydantic import BaseModel, ValidationError
 from typing import List
-from mongo_db import upsert_projects, get_projects, delete_projects
+from db.projects import upsert_projects, get_projects, delete_projects
 from utils.validation.project import Project
 from utils.misc import highlight_is_valid
 

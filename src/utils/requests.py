@@ -1,4 +1,4 @@
-from mongo_db import get_requests_by_id
+from db.requests import get_requests_by_id
 
 def execute_requests(ids):
     requests = get_requests_by_id(ids)

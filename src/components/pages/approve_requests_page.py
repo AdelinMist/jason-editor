@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from mongo_db import update_requests, get_requests_for_approval
+from db.requests import update_requests, get_requests_for_approval
 from utils.requests import execute_requests
 
 def approve_button_on_click():
@@ -57,8 +57,6 @@ class ApproveRequestsPage():
             use_container_width=False,
             width=10000,
         )
-        
-        st.write(st.session_state["approval_requests_selection_df"])
         
         st.button(
             label="Approve Requests",

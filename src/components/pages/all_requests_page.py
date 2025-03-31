@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from mongo_db import get_all_requests, update_requests
+from db.requests import get_all_requests, update_requests
 from utils.requests import execute_requests
 
 def reexec_button_on_click():
@@ -56,8 +56,6 @@ class AllRequestsPage():
             use_container_width=False,
             width=10000,
         )
-        
-        st.write(st.session_state["all_requests_selection_df"])
         
         st.button(
             label="Re-Execute Requests",

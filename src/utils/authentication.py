@@ -1,5 +1,5 @@
 import streamlit as st
-from mongo_db import get_project
+from db.projects import get_project
 
 def login():
     if not st.experimental_user.is_logged_in:

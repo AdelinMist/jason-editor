@@ -2,7 +2,7 @@ def get_validator():
     validator = {
         "$jsonSchema": {
             "bsonType": "object",
-            "required": ["type", "subject", "request_date", "project", "status", "request_objects"],
+            "required": ["type", "subject", "request_date", "project", "action", "status", "request_objects"],
             "properties": {
                 "type": {
                     "bsonType": "string",
@@ -15,6 +15,11 @@ def get_validator():
                 "request_date": {
                     "bsonType": "date",
                     "description": "must be a date and is required"
+                },
+                "action": {
+                    "enum": ["CREATE", "UPDATE", "DELETE"],
+                    "description": "can only be one of the enum values and \
+                    is required"
                 },
                 "status": {
                     "enum": ["APPROVAL_PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"],
