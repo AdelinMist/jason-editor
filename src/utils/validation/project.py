@@ -1,7 +1,7 @@
 from pydantic import field_validator, Field, BaseModel, ConfigDict
 from typing import Any
 import json
-from utils.validation import ObjectId
+from utils.validation.types import ObjectId
 
 class Project(BaseModel):
     

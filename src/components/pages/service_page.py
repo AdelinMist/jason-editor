@@ -10,6 +10,7 @@ from db.requests import insert_request
 from mongo_db import init_service_collection
 from utils.misc import highlight_is_valid
 from utils.validation.request import ActionType
+from db.services import get_my_service_objects,  upsert_services
 
 # jinja2 setup for the json schema templates
 # loading the environment
@@ -21,11 +22,12 @@ def validate_obj(obj, validation_cls):
     Runs a pydantic validation on the object passed.
     """
     try:
-        validated_obj = validation_cls(**obj).model_dump()
+        raw_obj = validation_cls(**obj)
+        validated_obj = raw_obj.model_dump()
     except ValidationError as err:
         raise err
         
-    return validated_obj
+    return validated_obj, raw_obj
 
 def validate_df(df, validation_cls, error_df_name):
     """
@@ -39,11 +41,13 @@ def validate_df(df, validation_cls, error_df_name):
     
     df_dict = df.loc[:, df.columns != 'is_valid'].to_dict(orient="records")
     validated_dict = []
+    raw_dict = []
     
     for index, obj in enumerate(df_dict):
         try:
-            validated_obj = validate_obj(obj, validation_cls)
+            validated_obj, raw_obj = validate_obj(obj, validation_cls)
             validated_dict.append(validated_obj)
+            raw_dict.append(raw_obj)
         except ValidationError as err:
             for err_inst in err.errors():
                 invalid_col = err_inst['loc'][0]
@@ -51,6 +55,7 @@ def validate_df(df, validation_cls, error_df_name):
                 df.loc[index, 'is_valid'] = False
     
     if st.session_state[error_df_name].empty:
+        st.session_state["temp"] = raw_dict
         df = pd.DataFrame.from_records(validated_dict).assign(is_valid=True)
         
     return df
@@ -102,46 +107,6 @@ def convert_to_dict(df, cls):
 
     
     return json_list
-
-def submit_button_on_click(**kwargs):
-    """
-    Handles submission on new request!
-    """
-    
-    validation_cls = kwargs['validation_cls'] 
-    df_name = kwargs['df_name']
-    deleted_df_name = kwargs['deleted_df_name']
-    added_set_name = kwargs['added_set_name']
-    edited_set_name = kwargs['edited_set_name']
-    service_name = kwargs['service_name']
-    
-    added_indices = st.session_state[df_name].index.isin(st.session_state[added_set_name])
-    added_objects = st.session_state[df_name].loc[added_indices]
-    added_objects = convert_to_dict(added_objects, validation_cls)
-    
-    edited_indices = st.session_state[df_name].index.isin(st.session_state[edited_set_name])
-    edited_objects = st.session_state[df_name].loc[edited_indices]
-    edited_objects = convert_to_dict(edited_objects, validation_cls)
-
-    objects_to_delete = convert_to_dict(st.session_state[deleted_df_name], validation_cls)
-    
-    try:
-        if len(added_objects) != 0:
-            insert_request(service_name, ActionType.CREATE, added_objects)
-            del st.session_state[added_set_name]
-            
-        if len(edited_objects) != 0:
-            insert_request(service_name, ActionType.UPDATE, edited_objects)
-            del st.session_state[edited_set_name]
-            
-        if len(objects_to_delete) != 0:
-            insert_request(service_name, ActionType.DELETE, objects_to_delete)
-            del st.session_state[deleted_df_name]
-            
-        del st.session_state[df_name]
-             
-    except Exception as err:
-        st.exception(err)
     
 
 class ServicePage():
@@ -150,6 +115,58 @@ class ServicePage():
     """
     def __init__(self, cls):
         self.cls = cls
+        split_name = re.sub( r"([A-Z])", r" \1", self.cls['name']).split()
+        lower_split_name = [word.lower() for word in split_name]
+        
+        ### init the db collection
+        coll_name = '_'.join(lower_split_name)
+        self.coll_name = coll_name
+        init_service_collection(coll_name)
+        
+        ### return page object
+        self.url_pathname = '-'.join(lower_split_name)
+        self.page_title = ' '.join(split_name)
+        
+    def submit_button_on_click(self, **kwargs):
+        """
+        Handles submission on new request!
+        """
+        
+        validation_cls = kwargs['validation_cls'] 
+        df_name = kwargs['df_name']
+        deleted_df_name = kwargs['deleted_df_name']
+        added_set_name = kwargs['added_set_name']
+        edited_set_name = kwargs['edited_set_name']
+        service_name = kwargs['service_name']
+        
+        added_indices = st.session_state[df_name].index.isin(st.session_state[added_set_name])
+        added_objects = st.session_state[df_name].loc[added_indices]
+        added_objects = convert_to_dict(added_objects, validation_cls)
+        
+        edited_indices = st.session_state[df_name].index.isin(st.session_state[edited_set_name])
+        edited_objects = st.session_state[df_name].loc[edited_indices]
+        edited_objects = convert_to_dict(edited_objects, validation_cls)
+
+        objects_to_delete = convert_to_dict(st.session_state[deleted_df_name], validation_cls)
+        
+        try:
+            if len(added_objects) != 0:
+                insert_request(service_name, ActionType.CREATE, added_objects)
+                upsert_services(st.session_state["temp"], self.coll_name)
+                del st.session_state[added_set_name]
+                
+            if len(edited_objects) != 0:
+                insert_request(service_name, ActionType.UPDATE, edited_objects)
+                del st.session_state[edited_set_name]
+                
+            if len(objects_to_delete) != 0:
+                insert_request(service_name, ActionType.DELETE, objects_to_delete)
+                del st.session_state[deleted_df_name]
+                
+            del st.session_state[df_name]
+                
+        except Exception as err:
+            st.exception(err)
         
     def data_editor_on_change(self, **kwargs):
         """
@@ -261,7 +278,7 @@ class ServicePage():
             key=submit_btn_name,
             icon=":material/skull:",
             disabled=submit_disabled,
-            on_click=submit_button_on_click,
+            on_click=self.submit_button_on_click,
             kwargs={'service_name': cls_name, 'added_set_name': added_set_name, 'edited_set_name': edited_set_name, 'df_name': df_name, 'deleted_df_name': deleted_df_name, 'validation_cls': self.cls}
         )
     
@@ -331,14 +348,19 @@ class ServicePage():
             st.session_state[deleted_df_name] = pd.DataFrame(columns=df_columns)
             
         if  df_name not in st.session_state or st.session_state[df_name].empty:
-            # Create an empty DataFrame with column names
-            st.session_state[df_name] = pd.DataFrame(columns=df_columns)
-            
+            # Create a DataFrame
+            # get service objects in db
+            service_objects = get_my_service_objects(self.coll_name)
+            st.session_state[df_name] = pd.DataFrame(service_objects, columns=df_columns)
+        
         st.session_state[styled_df_name] = st.session_state[df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
         columns_to_display = df_columns
         if 'id' in columns_to_display:
             columns_to_display.remove('id')
+        
+        if 'project' in columns_to_display:
+            columns_to_display.remove('project')
             
         st.subheader('Editor')
         st.data_editor(
@@ -364,15 +386,5 @@ class ServicePage():
         """
         Returns the page object as needed.
         """
-        split_name = re.sub( r"([A-Z])", r" \1", self.cls['name']).split()
-        lower_split_name = [word.lower() for word in split_name]
-        
-        ### init the db collection
-        coll_name = '_'.join(lower_split_name)
-        init_service_collection(coll_name)
-        
-        ### return page object
-        url_pathname = '-'.join(lower_split_name)
-        page_title = ' '.join(split_name)
         page_icon = getattr(self.cls['obj'], f"_{self.cls['name']}__icon") # getting the default 
-        return st.Page(self.run_page, title=page_title, icon=f"{page_icon.default}", url_path=url_pathname)
+        return st.Page(self.run_page, title=self.page_title, icon=f"{page_icon.default}", url_path=self.url_pathname)

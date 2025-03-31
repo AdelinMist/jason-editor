@@ -1,22 +1,24 @@
-from pydantic.functional_validators import AfterValidator
 from pydantic import BaseModel, Field
-from bson import ObjectId as _ObjectId
-from typing import Annotated, Optional
+from typing import Optional
 from enum import Enum
+from db.projects import get_project
+from .types import ObjectId
 
-def check_object_id(value: str) -> str:
-    if not _ObjectId.is_valid(value) and value != '':
-        raise ValueError('Invalid ObjectId')
-    return value
-
-ObjectId = Annotated[str, AfterValidator(check_object_id)]
+def default_project_factory():
+    """
+    Default factory for project values.
+    """
+    project = get_project()
+    return str(project['_id'])
 
 class CustomBaseModel(BaseModel):
     """
-    Custom base model with method overloads.
+    Custom base model with method overloads. This is for generic service objects!
     """
     
     id: Optional[ObjectId] = Field(description="The object id.", alias="_id", default=None)
+    
+    project: ObjectId = Field(description="The associated object's object id.", default_factory=default_project_factory) 
 
     def model_dump(self, **kwargs):
         """

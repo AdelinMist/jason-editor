@@ -1,7 +1,7 @@
 from pydantic import Field, ConfigDict, conlist, BaseModel
 from datetime import datetime
 from typing import Optional
-from utils.validation import ObjectId
+from utils.validation.types import ObjectId
 from bson import ObjectId as _ObjectId
 from enum import Enum
 
@@ -22,7 +22,7 @@ class Request(BaseModel):
     
     request_type: str = Field(description="The request type.") 
     
-    project: ObjectId = Field(description="The associated project's object id.") 
+    project: ObjectId = Field(description="The associated request's object id.") 
     
     request_date: datetime = Field(description="The request submission date.")
     

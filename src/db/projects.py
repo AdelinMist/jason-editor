@@ -1,7 +1,7 @@
 import streamlit as st
 import json
 from bson import ObjectId as _ObjectId
-from utils.validation import ObjectId
+from utils.validation.types import ObjectId
 from mongo_db import get_database
 from typing import List
 from utils.validation.project import Project

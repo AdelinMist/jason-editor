@@ -1,11 +1,11 @@
 import streamlit as st
-import validation
 import utils.authentication as auth
 from components.pages.service_page import ServicePage
 from components.pages.requests_page import MyRequestsPage
 from components.pages.all_requests_page import AllRequestsPage
 from components.pages.approve_requests_page import ApproveRequestsPage
 from components.pages.projects_page import ProjectsPage
+import validation
 
 if __name__ == '__main__':
     st.set_page_config(layout="wide")

@@ -16,6 +16,5 @@ def test_user_project():
     except Exception as err:
         return False
 
-
 def logout():
     st.button("Log out", on_click=st.logout)    
