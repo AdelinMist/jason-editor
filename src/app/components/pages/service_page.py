@@ -114,6 +114,10 @@ class ServicePage():
         objects_to_delete = convert_to_records(st.session_state[self.deleted_df_name])
         
         try:
+            print(added_objects)
+            print(edited_objects)
+            print(objects_to_delete)
+            
             if len(added_objects) != 0:
                 self.submit_logic(added_objects, ActionType.CREATE)
                 del st.session_state[self.added_set_name]
@@ -137,7 +141,6 @@ class ServicePage():
         Handles the changed data, and updates the relevant dataframe.
         Runs the validation function on the newly changed dataframe.
         """
-        cls_obj = self.cls['obj']
         state = st.session_state[self.edited_df_name]
         
         for index, updates in state["edited_rows"].items():
@@ -164,8 +167,6 @@ class ServicePage():
         """
         Handles file uploading into the app.
         """
-        cls_name = self.cls['name']
-        cls_obj = self.cls['obj']
         
         if  'file_uploader_key' not in st.session_state:
             st.session_state['file_uploader_key'] = 0

@@ -35,6 +35,24 @@ def get_project_by_id(id: ObjectId):
     return projects[0]
 
 @st.cache_data(ttl=100)
+@validate_call
+def get_project_by_name(name: str):
+    """
+    Retrieves the matched project by name.
+    """
+    db = get_database()
+    projects = db['projects'].find( { 'name': { '$eq': name } } )
+    
+    projects = list(projects)  # if for some reason there are multiple matches
+    
+    if len(projects) == 0:
+        ret_val = None
+    else:
+        ret_val = projects[0]
+        
+    return ret_val
+
+@st.cache_data(ttl=100)
 def get_projects():
     """
     Retrieves the matched project for the connected user.
