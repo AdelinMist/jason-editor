@@ -1,4 +1,6 @@
-from jinja2 import Environment, FileSystemLoader
+import json
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound
+import streamlit as st
 import os
 
 # jinja2 setup for the json schema templates
@@ -31,6 +33,31 @@ def get_json_schema_template_name(cls_obj):
         template_name = f"{cls_name}.jinja"
     
     return template_name
+
+@st.cache_data
+def convert_to_json(df, cls_obj):
+    """
+    Converts the dataframe to a json object.
+    Also replaces the string 'None' values with empty strings.
+    This functions result is cached.
+    """
+    df_to_convert = df.copy(deep=True).replace('None', '').drop(columns=['is_valid'])
+    
+    template_name = get_json_schema_template_name(cls_obj)
+    
+    json_list = []
+    for row in df_to_convert.to_dict('records'):
+        try:
+            # we also remove json control chars from the result of templating!
+            rendered_schema = render_jinja(template_name, **row)
+            json_to_add = json.loads(rendered_schema)
+        except TemplateNotFound as err:
+            json_to_add = row
+            
+        json_list.append(json_to_add)
+
+    
+    return json.dumps(json_list)
 
 def highlight_is_valid(val):
     """

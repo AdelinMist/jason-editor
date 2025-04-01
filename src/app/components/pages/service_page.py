@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from jinja2 import TemplateNotFound
 from db.requests import insert_request
 from mongo_db import init_service_collection
-from utils.misc import highlight_is_valid
+from utils.misc import highlight_is_valid, convert_to_json
 from utils.validation.request import ActionType
 from db.services import get_my_service_objects
 
@@ -247,6 +247,18 @@ class ServicePage():
             icon=":material/skull:",
             disabled=submit_disabled,
             on_click=self.submit_button_on_click
+        )
+        
+        json_obj = convert_to_json(st.session_state[self.df_name], self.cls['obj'])
+
+        st.download_button(
+            label="Download JSON",
+            data=json_obj,
+            file_name=f"{self.snake_case_name}_data.json",
+            mime="text/json",
+            icon=":material/prayer_times:",
+            disabled=submit_disabled,
+            on_click=st.snow
         )
         
     def get_page_data(self):
