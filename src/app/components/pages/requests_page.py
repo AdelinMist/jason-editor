@@ -57,6 +57,9 @@ class RequestsPage():
         Recreates the error dataframe based on current validation errors.
         Sets the 'is_valid' column on the dataframe based on validation results.
         """
+        if df.empty:
+            return df
+        
         st.session_state[self.error_df_name] = st.session_state[self.error_df_name].iloc[0:0].copy()
         
         df_dict = df.to_dict(orient="records")

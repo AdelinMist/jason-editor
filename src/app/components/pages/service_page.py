@@ -65,6 +65,9 @@ class ServicePage():
         Recreates the error dataframe based on current validation errors.
         Sets the 'is_valid' column on the dataframe based on validation results.
         """
+        if df.empty:
+            return df
+        
         st.session_state[self.error_df_name] = st.session_state[self.error_df_name].iloc[0:0].copy()
         
         df = df.assign(is_valid=True)
@@ -83,7 +86,8 @@ class ServicePage():
                     df.loc[index, 'is_valid'] = False
         
         if st.session_state[self.error_df_name].empty:
-            df = pd.DataFrame.from_records(validated_dict).assign(is_valid=True).replace({np.nan: None})
+            # create new df from the validated object list, but keep the old indices to know which rows were deleted/edited/added!
+            df = pd.DataFrame.from_records(validated_dict, index=df.index).assign(is_valid=True).replace({np.nan: None})
             
         return df
     
@@ -114,10 +118,6 @@ class ServicePage():
         objects_to_delete = convert_to_records(st.session_state[self.deleted_df_name])
         
         try:
-            print(added_objects)
-            print(edited_objects)
-            print(objects_to_delete)
-            
             if len(added_objects) != 0:
                 self.submit_logic(added_objects, ActionType.CREATE)
                 del st.session_state[self.added_set_name]
@@ -144,7 +144,8 @@ class ServicePage():
         state = st.session_state[self.edited_df_name]
         
         for index, updates in state["edited_rows"].items():
-            if index not in st.session_state[self.added_set_name]:
+            # add to edited rows only if wasn't created now
+            if not index in st.session_state[self.added_set_name]:
                 st.session_state[self.edited_set_name].add(index)
             for key, value in updates.items():
                 st.session_state[self.df_name].loc[st.session_state[self.df_name].index == index, key] = value
@@ -156,11 +157,21 @@ class ServicePage():
             
         for row_index in state["deleted_rows"]:
             # add deleted object to a list that will be made into a DELETE action request
-            if st.session_state[self.df_name].loc[row_index, 'is_valid']:
+            if not st.session_state[self.df_name].loc[row_index, 'is_valid']:
+                continue
+            
+            if row_index in st.session_state[self.added_set_name]:
+                # don't submit request if the row was created now as well
+                st.session_state[self.added_set_name].remove(row_index)
+            else:
                 deleted_row = st.session_state[self.df_name].loc[row_index].copy()
                 st.session_state[self.deleted_df_name] = pd.concat([st.session_state[self.deleted_df_name], deleted_row.to_frame().T], ignore_index=True)
-            st.session_state[self.df_name].drop(row_index, inplace=True)
-
+                st.session_state[self.df_name].drop(row_index, inplace=True)
+            
+            if row_index in st.session_state[self.edited_set_name]:
+                # deleting the row makes the edits made to it inconsequential, so remove it from the edited rows
+                st.session_state[self.edited_set_name].remove(row_index)
+            
         st.session_state[self.df_name] = self.validate_df(st.session_state[self.df_name])
         
     def upload_file(self):

@@ -155,12 +155,12 @@ def insert_request(req_type: str, req_action: ActionType, request_objects: list[
         request = Request(**{
             "request_type": req_type,
             "request_date": utc_datetime,
-            "project": str(project["_id"]),
+            "project": project["_id"],
             "action": req_action,
             "status": StatusType.APPROVAL_PENDING,
             "subject": subject,
             "request_objects": request_objects
-        }).model_dump(by_alias=True)
+        }).model_dump(by_alias=True, project_name_to_id=True)
         
         new_request= db['requests'].insert_one(request)
     except Exception as err:
