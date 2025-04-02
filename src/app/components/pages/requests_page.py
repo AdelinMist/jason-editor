@@ -32,7 +32,7 @@ class RequestsPage():
         try:
             exec_status = execute_requests(requests_to_execute)
             if exec_status:
-                requests_to_execute = requests_to_execute.assign(status='IN_PROGRESS').to_dict('records')
+                requests_to_execute = requests_to_execute.assign(status='APPROVED').to_dict('records')
             else:
                 requests_to_execute = requests_to_execute.assign(status='FAILED').to_dict('records')
             update_requests(requests_to_execute)

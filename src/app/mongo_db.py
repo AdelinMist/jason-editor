@@ -6,7 +6,7 @@ from utils.logger import logger
 # Uses st.cache_resource to only run once.
 @st.cache_resource
 def get_database():
-    client = pymongo.MongoClient(**st.secrets["mongo"])
+    client = pymongo.MongoClient(**st.secrets["mongo"], directConnection=True)
     db = client['platform']
     init_projects_collection(db)
     init_requests_collection(db)

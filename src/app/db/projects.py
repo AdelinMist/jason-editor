@@ -19,7 +19,12 @@ def get_project():
     
     projects = list(projects)  # if for some reason there are multiple matches
     
-    return projects[0]
+    if len(projects) == 0:
+        ret_val = None
+    else:
+        ret_val = projects[0]
+    
+    return ret_val
 
 @st.cache_data(ttl=100)
 @validate_call
@@ -31,8 +36,12 @@ def get_project_by_id(id: ObjectId):
     projects = db['projects'].find( { '_id': { '$eq': id } } )
     
     projects = list(projects)  # if for some reason there are multiple matches
-    
-    return projects[0]
+    if len(projects) == 0:
+        ret_val = None
+    else:
+        ret_val = projects[0]
+        
+    return ret_val
 
 @st.cache_data(ttl=100)
 @validate_call

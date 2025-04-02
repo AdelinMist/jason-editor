@@ -4,7 +4,7 @@ from bson import ObjectId
 from mongo_db import get_database
 from db.projects import get_project
 from pydantic import validate_call
-from typing import List
+from typing import List, TypeVar, Generic
 from utils.validation.request import Request, ActionType, StatusType
 
 def get_requests_by_id(ids):
@@ -38,7 +38,6 @@ def get_all_requests():
         {
             "$addFields": {
                 "project": "$project.name",
-                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -47,6 +46,9 @@ def get_all_requests():
     requests = db['requests'].aggregate(pipeline)
     
     requests = list(requests)
+    
+    # cast to request object
+    requests = [Request(**req).model_dump(object_id_to_str=True) for req in requests]
 
     return requests
 
@@ -71,7 +73,6 @@ def get_requests_for_approval():
         {
             "$addFields": {
                 "project": "$project.name",
-                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -80,6 +81,9 @@ def get_requests_for_approval():
     requests = db['requests'].aggregate(pipeline)
     
     requests = list(requests)
+    
+    # cast to request object
+    requests = [Request(**req).model_dump(object_id_to_str=True) for req in requests]
 
     return requests
 
@@ -106,7 +110,6 @@ def get_my_requests():
         {
             "$addFields": {
                 "project": "$project.name",
-                "_id": { "$convert": { "input": "$_id", "to": "string" } }
             }
         },
         { "$unwind": "$project" }
@@ -115,6 +118,9 @@ def get_my_requests():
     requests = db['requests'].aggregate(pipeline)
     
     requests = list(requests)
+    
+    # cast to request object
+    requests = [Request(**req).model_dump(object_id_to_str=True) for req in requests]
 
     return requests
 
@@ -138,8 +144,11 @@ def update_requests(requests: List[Request]):
     get_my_requests.clear()
     get_all_requests.clear()
 
+# set generic type var for the service type class
+T = TypeVar('T')
+
 @validate_call
-def insert_request(req_type: str, req_action: ActionType, request_objects: list[dict]):
+def insert_request(req_type: str, req_action: ActionType, request_objects: list[T] ):
     """
     Inserts a new request to the database.
     """
@@ -149,6 +158,8 @@ def insert_request(req_type: str, req_action: ActionType, request_objects: list[
     subject_field_name = st.secrets["auth"]["subject_token_field"]
     subject = st.experimental_user[subject_field_name]
     project = get_project()
+    
+    request_objects = [ obj.model_dump() for obj in request_objects ]
     
     try:
         # validate request
@@ -161,7 +172,6 @@ def insert_request(req_type: str, req_action: ActionType, request_objects: list[
             "subject": subject,
             "request_objects": request_objects
         }).model_dump(by_alias=True, project_name_to_id=True)
-        
         new_request= db['requests'].insert_one(request)
     except Exception as err:
         raise Exception("Error inserting request to db: ", err)

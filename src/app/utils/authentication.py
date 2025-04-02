@@ -12,7 +12,7 @@ def login():
 def test_user_project():
     try:
         project = get_project()
-        return True
+        return True if project != None else False
     except Exception as err:
         return False
 

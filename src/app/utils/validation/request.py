@@ -1,6 +1,7 @@
 from pydantic import Field, ConfigDict, conlist, BaseModel, field_validator
 from datetime import datetime
 from typing import Optional, Union
+from .generic import CustomBaseModel
 from utils.validation.types import ObjectId
 from bson import ObjectId as _ObjectId
 from enum import Enum
@@ -13,6 +14,7 @@ class ActionType(Enum):
     
 class StatusType(Enum):
     APPROVAL_PENDING = 'APPROVAL_PENDING'
+    APPROVED = 'APPROVED'
     IN_PROGRESS = 'IN_PROGRESS'
     COMPLETED = 'COMPLETED'
     FAILED = 'FAILED'
@@ -36,7 +38,7 @@ class Request(BaseModel):
     
     subject: str = Field(description="The request's subject.")
     
-    request_objects: conlist(dict, min_length=1) = Field(description="The request objects, in the form of a list of objects. \
+    request_objects: conlist(CustomBaseModel, min_length=1) = Field(description="The request objects, in the form of a list of objects. \
         These will be passed to the backend in an API call!")
     
     @field_validator('project', mode='after')  

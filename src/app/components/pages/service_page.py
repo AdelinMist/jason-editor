@@ -95,6 +95,9 @@ class ServicePage():
         """
         Handles the submission logic itself, based on the action type.
         """
+        # cast the submitted objects to the pydantic class representing them
+        submitted_objects = [ self.cls['obj'](**obj) for obj in submitted_objects ]
+        
         if action_type == ActionType.CREATE:
             insert_request(self.snake_case_name, ActionType.CREATE, submitted_objects)
         elif action_type == ActionType.UPDATE:

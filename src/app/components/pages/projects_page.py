@@ -20,6 +20,8 @@ class ProjectsPage(ServicePage):
         
         self.page_title = 'Projects'
         
+        self.snake_case_name = 'project'
+        
     def submit_logic(self, submitted_objects, action_type):
         """
         Handles the submission logic itself, based on the action type.
