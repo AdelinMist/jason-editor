@@ -5,11 +5,7 @@ import re
 import numpy as np
 from pydantic import ValidationError
 from jinja2 import TemplateNotFound
-from db.requests import insert_request
-from mongo_db import init_service_collection
 from utils.misc import highlight_is_valid, convert_to_json
-from utils.validation.request import ActionType
-from db.services import get_my_service_objects
 
 @st.cache_data
 def convert_to_records(df):
@@ -40,7 +36,6 @@ class ServicePage():
         ### init the db collection
         snake_case_name = '_'.join(lower_split_name)
         self.snake_case_name = snake_case_name
-        init_service_collection(snake_case_name)
         
         ### return page object
         self.url_pathname = '-'.join(lower_split_name)
@@ -53,7 +48,7 @@ class ServicePage():
         validation_cls = self.cls['obj']
         try:
             raw_obj = validation_cls(**obj)
-            validated_obj = raw_obj.model_dump(object_id_to_str=True)
+            validated_obj = raw_obj.model_dump()
         except ValidationError as err:
             raise err
             
@@ -90,53 +85,6 @@ class ServicePage():
             df = pd.DataFrame.from_records(validated_dict, index=df.index).assign(is_valid=True).replace({np.nan: None})
             
         return df
-    
-    def submit_logic(self, submitted_objects, action_type):
-        """
-        Handles the submission logic itself, based on the action type.
-        """
-        # cast the submitted objects to the pydantic class representing them
-        submitted_objects = [ self.cls['obj'](**obj) for obj in submitted_objects ]
-        
-        if action_type == ActionType.CREATE:
-            insert_request(self.snake_case_name, ActionType.CREATE, submitted_objects)
-        elif action_type == ActionType.UPDATE:
-            insert_request(self.snake_case_name, ActionType.UPDATE, submitted_objects)
-        elif action_type == ActionType.DELETE:
-            insert_request(self.snake_case_name, ActionType.DELETE, submitted_objects)
-        
-    def submit_button_on_click(self):
-        """
-        Handles submission on new request!
-        """
-        
-        added_indices = st.session_state[self.df_name].index.isin(st.session_state[self.added_set_name])
-        added_objects = st.session_state[self.df_name].loc[added_indices]
-        added_objects = convert_to_records(added_objects)
-        
-        edited_indices = st.session_state[self.df_name].index.isin(st.session_state[self.edited_set_name])
-        edited_objects = st.session_state[self.df_name].loc[edited_indices]
-        edited_objects = convert_to_records(edited_objects)
-
-        objects_to_delete = convert_to_records(st.session_state[self.deleted_df_name])
-        
-        try:
-            if len(added_objects) != 0:
-                self.submit_logic(added_objects, ActionType.CREATE)
-                del st.session_state[self.added_set_name]
-                
-            if len(edited_objects) != 0:
-                self.submit_logic(edited_objects, ActionType.UPDATE)
-                del st.session_state[self.edited_set_name]
-                
-            if len(objects_to_delete) != 0:
-                self.submit_logic(objects_to_delete, ActionType.DELETE)
-                del st.session_state[self.deleted_df_name]
-                
-            del st.session_state[self.df_name]
-                
-        except Exception as err:
-            st.exception(err)
         
     def data_editor_on_change(self):
         """
@@ -227,30 +175,21 @@ class ServicePage():
                     st.error("File didn't have the correct columns! Please load a matching file next time!")
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
         
-    def submit_request(self):
+    def download_json(self):
         """
-        Handles the submission of a request.
+        Handles the download of a json object.
         """
         cls_name = self.cls['name']
         
         # handle download and data validity message
-        submit_disabled = False if st.session_state[self.df_name]['is_valid'].all() else True
+        json_disabled = False if st.session_state[self.df_name]['is_valid'].all() else True
         
-        if submit_disabled:
+        if json_disabled:
             st.error(f"The values are not valid!")
             st.subheader('Errors')
             st.dataframe(st.session_state[self.error_df_name], use_container_width=True)
         else:
             st.success(f"The values are valid!")
-
-        submit_btn_name = f"submit_btn_{cls_name}"
-        st.button(
-            label="Submit Request",
-            key=submit_btn_name,
-            icon=":material/skull:",
-            disabled=submit_disabled,
-            on_click=self.submit_button_on_click
-        )
         
         json_obj = convert_to_json(st.session_state[self.df_name], self.cls['obj'])
 
@@ -260,15 +199,9 @@ class ServicePage():
             file_name=f"{self.snake_case_name}_data.json",
             mime="text/json",
             icon=":material/prayer_times:",
-            disabled=submit_disabled,
+            disabled=json_disabled,
             on_click=st.snow
         )
-        
-    def get_page_data(self):
-        """
-        This function simply gets the data already existing in the db for this page.
-        """
-        return get_my_service_objects(self.snake_case_name)
     
     def run_page(self):
         """
@@ -340,11 +273,7 @@ class ServicePage():
         if  self.df_name not in st.session_state or st.session_state[self.df_name].empty:
             # Create a DataFrame
             # get service objects in db
-            service_objects = self.get_page_data()
-            service_objects_df = pd.DataFrame.from_records(service_objects)
-            if not service_objects_df.empty:
-                service_objects_df = self.validate_df(service_objects_df)
-            st.session_state[self.df_name] = pd.DataFrame(service_objects_df, columns=df_columns).astype(str)
+            st.session_state[self.df_name] = pd.DataFrame(columns=df_columns).astype(str)
         
         st.session_state[self.styled_df_name] = st.session_state[self.df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
 
@@ -372,7 +301,7 @@ class ServicePage():
         self.upload_file()
         
         if not st.session_state[self.df_name].empty or not st.session_state[self.deleted_df_name].empty:
-            self.submit_request()
+            self.download_json()
         
     def get_page(self):
         """
