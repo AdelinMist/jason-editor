@@ -113,6 +113,7 @@ services:
       - localnet
     volumes:
       - data_db:/data/db
+      - ../src/consumer/source_connector:/scratch_space/source_connector
     restart: always
 
   mongo1-setup:
@@ -132,8 +133,7 @@ services:
       [
         "bash",
         "-c",
-        "sleep 10 && mongosh --host mongo1:27017 /scratch_space/config-replica.js && sleep 10 && \
-        cx ./source_connector/approved_requests_source.json",
+        "sleep 10 && mongosh --host mongo1:27017 /scratch_space/config-replica.js && sleep 10"
       ]
     restart: "no"
 
