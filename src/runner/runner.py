@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import pymongo
 from json import dumps
 from logger import logger
+import threading
+import queue
 
 load_dotenv()  # take environment variables
 
@@ -38,3 +40,23 @@ while True:
     except Exception as e:
         logger.exception(e)
         logger.info("Trying to use resume token to continue...")
+
+q = queue.Queue()
+
+def worker():
+    while True:
+        item = q.get()
+        print(f'Working on {item}')
+        print(f'Finished {item}')
+        q.task_done()
+
+# Turn-on the worker thread.
+threading.Thread(target=worker, daemon=True).start()
+
+# Send thirty task requests to the worker.
+for item in range(30):
+    q.put(item)
+
+# Block until all tasks are done.
+q.join()
+print('All work completed')
