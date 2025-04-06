@@ -6,7 +6,7 @@ COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy in the source code
-COPY ./ ./
+COPY ./src ./
 EXPOSE 8443
 
 # Setup an app user so the container doesn't run as the root user, also add permission for /app to the new user

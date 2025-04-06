@@ -57,15 +57,16 @@ This application has the following plugin capabilities:
     The __icon hidden attribute sets the icon in the sidebar of the application for the page with this specific edited object.
     The __json_schema_template_name hidden attribute sets name of the jinja2 template to use for the json object we download for this class.
     Both hidden attributes are OPTIONAL!
+    The class must inherit from CustomBaseModel
 
     Simple example for a validation class file (windows_machine.py):
 
     ```python
     from pydantic import field_validator, Field, BaseModel
-    from typing import Annotated
+    from utils.validation import CustomBaseModel
     import data_plugins as dp
         
-    class LinuxMachine(BaseModel):
+    class LinuxMachine(CustomBaseModel):
         __icon: str = ':material/ac_unit:'
         
         __json_schema_template_name: str = 'linux_machine.jinja'
