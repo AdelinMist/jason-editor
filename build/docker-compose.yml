@@ -1,5 +1,42 @@
 version: "1.0"
 services:
+  mongo1:
+    image: "mongodb-kafka-base-mongod:1.0"
+    container_name: mongo1
+    ports:
+      - "35001:27017"
+    build:
+      context: .
+      dockerfile: mongo.Dockerfile
+    command: --replSet rs0 --oplogSize 128
+    networks:
+      - localnet
+    volumes:
+      - data_db:/data/db
+    restart: always
+
+  mongo1-setup:
+    image: "mongodb-kafka-base-setup-mongod:1.0"
+    container_name: mongo1-setup
+    build:
+      context: .
+      dockerfile: mongo.Dockerfile
+    depends_on:
+      - mongo1
+    networks:
+      - localnet
+    volumes:
+      - ./config-replica.js:/scratch_space/config-replica.js
+      - ./config-admin-user.js:/scratch_space/config-admin-user.js
+    entrypoint:
+      [
+        "bash",
+        "-c",
+        "sleep 10 && mongosh --host mongo1:27017 /scratch_space/config-replica.js && sleep 10 && \
+        mongosh --host mongo1:27017 /scratch_space/config-admin-user.js"
+      ]
+    restart: "no"
+
   platform-ui:
     image: "platform-ui:1.1.2"
     container_name: platform-ui
@@ -8,6 +45,9 @@ services:
       dockerfile: platform-ui.Dockerfile
     ports:
       - "8443:8443"
+    depends_on:
+      - mongo1
+      - mongo1-setup
     networks:
       - localnet
     volumes:
@@ -18,20 +58,19 @@ services:
     restart: "no"
 
   requests-runner:
-    image: "requests-runner:1.0.0"
-    container_name: platform-ui
+    image: "requests-runner:1.0.3"
+    container_name: requests-runner
     build:
-      context: ../src/app
-      dockerfile: platform-ui.Dockerfile
-    ports:
-      - "8443:8443"
+      context: ../src/runner
+      dockerfile: runner.Dockerfile
     networks:
       - localnet
+    depends_on:
+      - mongo1
+      - mongo1-setup
     volumes:
-      - ../src/app/data_plugins:/app/data_plugins
-      - ../src/app/validation_classes:/app/validation_classes
-      - ../src/app/json_schema_templates:/app/json_schema_templates
-      - ./secrets.toml:/app/.streamlit/secrets.toml
+      - ../src/runner/.env:/app/.env
+      - ../src/runner/runner.py:/app/runner.py
     restart: "no"
 
 networks:
