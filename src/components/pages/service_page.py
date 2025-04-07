@@ -276,19 +276,11 @@ class ServicePage():
             st.session_state[self.df_name] = pd.DataFrame(columns=df_columns).astype(str)
         
         st.session_state[self.styled_df_name] = st.session_state[self.df_name].style.map(highlight_is_valid, subset=pd.IndexSlice[:, ['is_valid']])
-
-        columns_to_display = df_columns
-        if 'id' in columns_to_display:
-            columns_to_display.remove('id')
-        
-        if 'project' in columns_to_display:
-            columns_to_display.remove('project')
         
         st.subheader('Editor')
         st.data_editor(
             st.session_state[self.styled_df_name],
             column_config=column_cfg,
-            column_order=columns_to_display,
             key=self.edited_df_name,
             disabled=["is_valid"],
             num_rows="dynamic",
