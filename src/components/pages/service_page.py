@@ -163,7 +163,6 @@ class ServicePage():
                 dataframe = dataframe.astype(str)
                 
                 dataframe = self.validate_df(dataframe)
-                print(dataframe)
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
                 if dataframe.columns.to_list() == st.session_state[self.df_name].columns.to_list():
                     try:
@@ -173,7 +172,6 @@ class ServicePage():
                         st.exception(err)
                     
                     st.session_state[self.df_name] = self.validate_df(st.session_state[self.df_name])
-                    print(st.session_state[self.df_name])
                     # this is a hack to make this whole function run once for each file uploaded.
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
                     
