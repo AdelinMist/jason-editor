@@ -221,7 +221,7 @@ class ServicePage():
         ### Set up column config with the selectbox for Enum attributes
         
         column_cfg={
-            "is_valid": st.column_config.TextColumn("IsValid", width="large", default=False),
+            "is_valid": st.column_config.TextColumn("IsValid", width="medium", default=False),
         }
         
         self.enum_members = []
@@ -238,7 +238,7 @@ class ServicePage():
                 column_cfg.update({member: st.column_config.SelectboxColumn(
                     f"{member.capitalize()}",
                     help=cls_obj.model_fields[member].description,
-                    width="large",
+                    width="medium",
                     options=member_values,
                     required=True,
                 )})
@@ -246,7 +246,7 @@ class ServicePage():
                 column_cfg.update({member: st.column_config.TextColumn(
                     f"{member.capitalize()}",
                     help=cls_obj.model_fields[member].description,
-                    width="large",
+                    width="medium",
                     required=True,
                 )})
         
