@@ -33,13 +33,15 @@ class ServicePage():
         
         self.page_title = ' '.join(split_name)
         
-        ### init the db collection
         snake_case_name = '_'.join(lower_split_name)
         self.snake_case_name = snake_case_name
         
         ### return page object
         self.url_pathname = '-'.join(lower_split_name)
         self.page_title = ' '.join(split_name)
+        
+        ### misc
+        self.enum_members = []
         
     def validate_obj(self, obj):
         """
@@ -77,6 +79,9 @@ class ServicePage():
             except ValidationError as err:
                 for err_inst in err.errors():
                     invalid_col = err_inst['loc'][0]
+                    # handle the enum case, prevent forcing an invalid value into the choicebox - that breaks the component!
+                    if invalid_col in self.enum_members:
+                        df.loc[index, invalid_col] = None
                     st.session_state[self.error_df_name].loc[index, invalid_col] = err_inst['msg']
                     df.loc[index, 'is_valid'] = False
         
@@ -158,6 +163,7 @@ class ServicePage():
                 dataframe = dataframe.astype(str)
                 
                 dataframe = self.validate_df(dataframe)
+                print(dataframe)
                 # try to add the uploaded df to the saved one, throw exception if columns don't match
                 if dataframe.columns.to_list() == st.session_state[self.df_name].columns.to_list():
                     try:
@@ -167,6 +173,7 @@ class ServicePage():
                         st.exception(err)
                     
                     st.session_state[self.df_name] = self.validate_df(st.session_state[self.df_name])
+                    print(st.session_state[self.df_name])
                     # this is a hack to make this whole function run once for each file uploaded.
                     st.session_state['file_uploader_key'] = st.session_state['file_uploader_key'] + 1
                     
@@ -219,6 +226,8 @@ class ServicePage():
             "is_valid": st.column_config.TextColumn("IsValid", width="large", default=False),
         }
         
+        self.enum_members = []
+        
         for member in members:
             member_type = cls_obj.model_fields[member].annotation
             try:
@@ -226,6 +235,7 @@ class ServicePage():
             except:
                 is_enum = False
             if is_enum:
+                self.enum_members.append(member)
                 member_values = [el.value for el in member_type]
                 column_cfg.update({member: st.column_config.SelectboxColumn(
                     f"{member.capitalize()}",

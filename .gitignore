@@ -3,7 +3,7 @@
 .streamlit*
 *logs.txt
 temp*
-**/validation_classes/*
-**/data_plugins/*
-**json_schema_templates/*
+**validation_classes*
+**data_plugins*
+**json_schema_templates*
 **.env

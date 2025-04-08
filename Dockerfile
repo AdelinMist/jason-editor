@@ -13,4 +13,4 @@ EXPOSE 8443
 RUN useradd app; chmod -R u+rwx .; chown -R app .
 USER app
 
-CMD ["streamlit", "run", "./platform-ui.py", "--server.port", "8443"]
+CMD ["streamlit", "run", "./jason_editor.py", "--server.port", "8443"]
